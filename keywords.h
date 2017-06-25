@@ -1,0 +1,5 @@
+xx(TK_INT,      "int")
+xx(TK_CHAR,     "char")
+xx(TK_CONST,    "const")
+xx(TK_VOID,     "void")
+xx(TK_RETURN,   "return")
