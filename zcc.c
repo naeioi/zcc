@@ -11,21 +11,31 @@
 /* =-- forward declaration --= */
 int lex_next();
 int lex_getc();
+int lex_isbinaryop(token_st*);
+int lex_isunaryop(token_st*);
+
+int prs_expect_char(char);
+int prs_binary();
+int prs_expr();
+int prs_primary();
+int prs_unary();
+int prs_pst(int);
 
 /* =---- utility ----= */
 void fexit(const char *format, ...) {
     puts(format);
+    printf("\n");
     exit(0);
 }
 
 /* =---- lex ----= */ 
 
+/* -- structs used for lexer -- */
 enum lex_ecode_en {
     ELEX_FILE_NULL = 1,
     ELEX_FEOF
 };
 
-/* -- struct used for lexer -- */
 typedef enum tk_class_en {
     // keywords 
     TK_INT = 1,
@@ -39,8 +49,9 @@ typedef enum tk_class_en {
     TK_CONST_STRING,
     // operator / delimiter 
     TK_OP,
-    #define xx(tk_class, u) tk_class,
-    #define yy(tk_class, u) tk_class,
+    TK_OP_SIZEOF,
+    #define xx(tk_class, u, v, w) tk_class,
+    #define yy(tk_class, u, v, w) tk_class,
     #define zz(tk_class, u) 
     #include "operators.h"
     #undef xx
@@ -77,6 +88,27 @@ int lex_load_file(const char *filename) {
 
 int lex_isspace(char c) {
     return c == ' ' || c == '\r' || c == '\n' || c == '\t';
+}
+
+/***
+ * one of || && | ^ & == != < > <= >= << >> + - * / %
+ */
+int lex_isbinaryop(token_st* tk) {
+    return tk->tk_class >= BINARY_OP_START && tk->tk_class <= BINARY_OP_END;
+}
+
+/***
+ * one of ++ -- & * + - - !
+ */
+int lex_isunaryop(token_st *tk) {
+    return 
+        tk->tk_class == TK_OP_INC   ||
+        tk->tk_class == TK_OP_DEC   ||
+        tk->tk_class == TK_OP_BAND  || 
+        tk->tk_class == TK_OP_MUL   ||
+        tk->tk_class == TK_OP_ADD   ||
+        tk->tk_class == TK_OP_DEL   ||
+        tk->tk_class == TK_OP_LNOT;
 }
 
 int lex_peek() {
@@ -145,9 +177,9 @@ int lex_next() {
     buf[0] = lex_getc();
     if((c = lex_peek()) != -1) {
         buf[1] = c; buf[2] = 0;
-        #define xx(u, v)
+        #define xx(u, v, w, q)
         #define zz(u, v)
-        #define yy(tk_class_, tk_str_) \
+        #define yy(tk_class_, tk_str_, u, v) \
             if(strcmp(buf, tk_str_) == 0) { \
                 assert(lex_token.tk_class == 0); \
                 lex_token.tk_class = tk_class_; \
@@ -166,8 +198,8 @@ int lex_next() {
     /* single char operators / delimiters */
     buf[0] = c = lex_peek(); buf[1] = 0;
     #define yy(u, v)
-    #define zz xx
-    #define xx(tk_class_, tk_char_) \
+    #define zz(tk_class_, tk_char_) xx(tk_class_, tk_char_, 0, 0)
+    #define xx(tk_class_, tk_char_, u, v) \
         if(c == tk_char_)  \
             lex_token.tk_class = tk_class_;
     #include "operators.h"
@@ -259,6 +291,180 @@ void lex_init() {
     lex_nextc = -1;
     lex_fp = NULL;
 }
+
+/* =---- Parser ----= */
+
+/* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
+
+int prs_prec[256];
+int prs_asso[256];
+
+void prs_init() {
+    #define xx yy
+    #define yy(tk_class, u, asso_, prec_) \
+        prs_prec[tk_class] = prec_; \
+        prs_asso[tk_class] = asso_;
+    #include "operators.h"
+    #undef xx
+    #undef yy
+}
+
+int prs_expr() {
+    prs_binary();
+    return 0;
+}
+
+/***
+ binary-expression:
+    unary-expression { binary-operator unary-expression }
+ 
+ Note: 
+    prs_binary(k): parse binary expression of precedence k or higher
+    precedence defined in operators.h
+    trick avoiding deep recursion descripted in LCC Chap.8.6
+*/
+
+int prs_binary(int k) {
+    int i;
+    prs_unary();
+    for(i = prec[lex_token.tk_class]; i >= k; i--) {
+        /* parse from high precedence to low precedence */
+        /* TODO: manage && || execution flow */
+        while(prec[lex_token.tk_class] == i) {
+            lex_next();
+            prs_binary(i+1);
+        }
+    }
+    return 0;
+}
+
+/***
+ unary-expression:
+    postfix-expression
+    unary-operator unary-expression
+    '(' type-name ')' unary-expression
+    sizeof unary-expression
+    sizeof '(' type-name ')'
+*/
+
+int prs_unary() {
+    if(lex_token.tk_class == TK_OP_SIZEOF) {
+        lex_next(); 
+        if(lex_token.tk_str[0] == '(') {
+            /* => sizeof '(' type-name ')' */
+            lex_next();
+            if(!sym_has(&lex_token))
+                fexit("expect `type-name`.");
+            else {
+                lex_next();
+                prs_expect_char(')'); lex_next();
+            }
+        }
+        else 
+            /* => sizeof unary-expression */
+            prs_unary();
+    }
+    else if(lex_token.tk_str[0] == '(') {
+        lex_next();
+        if(sym_has(&lex_token)) {
+            /* => '(' type-name ')' unary-expression */
+            lex_next();
+            prs_expect_char(')'); lex_next();
+            prs_unary();
+        }
+        else {
+            /* TRICK: parsed primary-expression for postfix-expression
+             * => postfix-expression 
+             * => primary-expression { postfix-operator }
+             * => '(' expression ')' { postfix-operator }
+             */
+             prs_expr();
+             prs_expect_char(')'); lex_next();
+             prs_pst(1);
+        }
+    }
+    else {
+        /* => unary-operator unary-expression */
+        lex_isunaryop(&lex_token);
+        lex_next();
+        prs_unary();
+    }
+    return 0;
+}
+
+/***
+ postfix-expression:
+    primary-expression { postfix-operator }
+ postfix-operator:
+    '[' expression ']'
+    . identifier
+    -> identifier
+    ++
+    -- 
+    
+ Note: assume primary-expression parsed by caller and passed(?) in.
+*/
+
+int prs_pst(int passed_primary/* placeholder for primary-expression */) {
+    if(!passed_primary)
+        prs_primary();
+    while(1) {
+        /* TODO: parse postfix-operator */
+        if(lex_token.tk_str[0] == '[') {
+            /* => '[' expression ']' */
+            lex_next();
+            prs_expr();
+            prs_expect_char(']'); lex_next();
+        }
+        else if(lex_token.tk_str[0] == '.') {
+            lex_next();
+            sym_hasid(&lex_token);
+            lex_next();
+        }
+        else if(lex_token.tk_class == TK_OP_DEREF) {
+            lex_next();
+            sym_hasid(&lex_token);
+            lex_next();
+        }
+        else if(lex_token.tk_class == TK_OP_INC) {
+            lex_next();
+        }
+        else if(lex_token.tk_class == TK_OP_DEC) {
+            lex_next();
+        }
+        else break;
+    }
+    return 0;
+}
+
+/***
+ primary-expression:
+    identifer
+    constant
+    string-literal
+    '(' expression ')'
+*/
+
+int prs_primary() {
+    if(lex_token.tk_class == TK_IDENTIFIER) {
+        lex_next();
+    }
+    else if(len_token.tk_class == TK_CONST_INT) {
+        lex_next();
+    }
+    else if(len_token.tk_str[0] == '(') {
+        lex_next();
+        prs_expr();
+        lex_next();
+        prs_expect_char(')');
+        lex_next();
+    }
+    else 
+        fexit("Unexpected token");
+    return 0;
+}
+
+/* =---- Others ----= */
 
 void init(int argc, char **argv) {
     lex_init();
