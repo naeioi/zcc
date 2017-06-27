@@ -40,6 +40,8 @@ zz(TK_DELIMITER,    '{')
 zz(TK_DELIMITER,    '}')
 zz(TK_DELIMITER,    ';')
 zz(TK_DELIMITER,    ',')
+zz(TK_DELIMITER,    '?')
+zz(TK_DELIMITER,    ':')
 
 #ifndef BINARY_OP_BEGIN
 #define BINARY_OP_BEGIN     TK_OP_LAND

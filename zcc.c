@@ -8,13 +8,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-/* =---- utility ----= */
-void fexit(const char *format, ...) {
-    puts(format);
-    printf("\n");
-    exit(0);
-}
-
 /* -- structs used for lexer -- */
 enum lex_ecode_en {
     ELEX_FILE_NULL = 1,
@@ -71,9 +64,20 @@ int prs_expr();
 int prs_primary();
 int prs_unary();
 int prs_pst(int);
+int prs_assign();
+int prs_cond();
 
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
+
+void fexit(const char *format, ...);
+ 
+/* =---- utility ----= */
+void fexit(const char *format, ...) {
+    puts(format);
+    printf("\n");
+    exit(0);
+}
  
 /* =---- lex ----= */ 
  
@@ -304,7 +308,15 @@ void lex_init() {
 
 /* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
 
-#define PT_FUNC fprintf(stderr, "In %s()\n", __FUNCTION__);
+int _prs_depth = -1;
+#define PRS_FUNC_BG _prs_depth++;
+#define PRS_FUNC_ED _prs_depth--;
+#define PT_PRT_IND \
+    int _i = _prs_depth; \
+    while(_i--) fprintf(stderr, "- "); 
+#define PT_FUNC \
+    PT_PRT_IND \
+    fprintf(stderr, "In %s()\n", __FUNCTION__);
 
 int prs_prec[256];
 int prs_asso[256];
@@ -326,10 +338,81 @@ int prs_expect_char(char c) {
     return 0;
 }
 
+/***
+expression:
+    assignment-expression { , assignment-expression }
+*/
 int prs_expr() {
+    PRS_FUNC_BG
+    PT_FUNC
+    
+    //prs_binary(prs_prec[TK_OP_ASSIGN]);
+    prs_assign();
+    while(lex_isvalid() && lex_token.tk_str[0] == ',') {
+        PT_PRT_IND
+        fprintf(stderr, "operator[,]\n");
+        
+        prs_assign();
+    }
+    
+    PRS_FUNC_ED
+    return 0;
+}
+
+/***
+assignment-expression:
+    conditional-expression
+    unary-expression assign-operator assignment-expression
+assign-operator:
+    one of = += -=  *=  /=  %=  <<= >>=  &=  ^=  |=
+    
+Note:
+    It's hard to choose from one of the production. 
+    So we merge them into 
+    => conditional-expression assign-operator assignment-expression
+    
+    This leads to incorrect expresstion like a + b = c gets accepted
+    But we could leave error detection later to semantic stage
+*/
+int prs_assign() {
+    PRS_FUNC_BG
+    PT_FUNC
+    
+    prs_cond();
+    while(lex_isvalid() && lex_isassign(&lex_token)) {
+        lex_next();
+        
+        PT_PRT_IND
+        fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
+        
+        prs_assign();
+    }
+    
+    PRS_FUNC_ED
+    return 0;
+}
+
+/***
+conditional-expression:
+    binary-expression [ ? expression : conditional-expression ]
+*/
+
+int prs_cond() {
+    PRS_FUNC_BG
     PT_FUNC
     
     prs_binary(prs_prec[TK_OP_ASSIGN]);
+    if(lex_isvalid() && lex_token.tk_str[0] == ':') {
+        PT_PRT_IND
+        fprintf(stderr, "operator[?:]\n");
+        
+        lex_next();
+        prs_expr();
+        prs_expect_char(':'); lex_next();
+        prs_cond();
+    }
+    
+    PRS_FUNC_ED
     return 0;
 }
 
@@ -344,6 +427,9 @@ int prs_expr() {
 */
 
 int prs_binary(int k) {
+    PRS_FUNC_BG
+    
+    PT_PRT_IND
     fprintf(stderr, "In prs_binary(k=%d)\n", k);
     
     int i;
@@ -351,12 +437,17 @@ int prs_binary(int k) {
     for(i = prs_prec[lex_token.tk_class]; lex_valid() && i >= k; i--) {
         /* parse from high precedence to low precedence */
         /* TODO: manage && || execution flow */
-        printf("lex_token = (\"%s\", %d)\n", lex_token.tk_str, prs_prec[lex_token.tk_class]);
         while(lex_valid() && prs_prec[lex_token.tk_class] == i) {
+            
+            PT_PRT_IND
+            fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
+            
             lex_next();
             prs_binary(i+1);
         }
     }
+    
+    PRS_FUNC_ED
     return 0;
 }
 
@@ -370,6 +461,8 @@ int prs_binary(int k) {
 */
 
 int prs_unary() {
+    PRS_FUNC_BG
+    
     PT_FUNC
     
     if(lex_token.tk_class == TK_OP_SIZEOF) {
@@ -415,6 +508,8 @@ int prs_unary() {
     else {
         prs_pst(0);
     }
+    
+    PRS_FUNC_ED
     return 0;
 }
 
@@ -423,6 +518,7 @@ int prs_unary() {
     primary-expression { postfix-operator }
  postfix-operator:
     '[' expression ']'
+    '(' expression ')'
     . identifier
     -> identifier
     ++
@@ -432,6 +528,8 @@ int prs_unary() {
 */
 
 int prs_pst(int passed_primary/* placeholder for primary-expression */) {
+    PRS_FUNC_BG
+    
     PT_FUNC
     
     if(!passed_primary)
@@ -444,6 +542,11 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
             lex_next();
             prs_expr();
             prs_expect_char(']'); lex_next();
+        }
+        else if(lex_token.tk_str[0] == '(') {
+            lex_next();
+            prs_expr();
+            prs_expect_char(')'); lex_next();
         }
         else if(lex_token.tk_str[0] == '.') {
             lex_next();
@@ -463,6 +566,8 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
         }
         else break;
     }
+    
+    PRS_FUNC_ED
     return 0;
 }
 
@@ -475,13 +580,15 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
 */
 
 int prs_primary() {
-    PT_FUNC
+    PRS_FUNC_BG
 
     if(lex_token.tk_class == TK_IDENTIFIER) {
+        PT_PRT_IND
         printf("prs_primary[IDENTIFIER=%s]\n", lex_token.tk_str);
         lex_next();
     }
     else if(lex_token.tk_class == TK_CONST_INT) {
+        PT_PRT_IND
         printf("prs_primary[CONST=%s]\n", lex_token.tk_str);
         lex_next();
     }
@@ -495,8 +602,7 @@ int prs_primary() {
     else 
         fexit("Unexpected token");
     
-    fprintf(stderr, "prs_primary() ends\n");
-    
+    PRS_FUNC_ED
     return 0;
 }
 
