@@ -8,27 +8,12 @@
 #include <assert.h>
 #include <stdlib.h>
 
-/* =-- forward declaration --= */
-int lex_next();
-int lex_getc();
-int lex_isbinaryop(token_st*);
-int lex_isunaryop(token_st*);
-
-int prs_expect_char(char);
-int prs_binary();
-int prs_expr();
-int prs_primary();
-int prs_unary();
-int prs_pst(int);
-
 /* =---- utility ----= */
 void fexit(const char *format, ...) {
     puts(format);
     printf("\n");
     exit(0);
 }
-
-/* =---- lex ----= */ 
 
 /* -- structs used for lexer -- */
 enum lex_ecode_en {
@@ -73,6 +58,25 @@ typedef struct token_st {
     value_un *value;
 } token_st;
  
+/* =-- forward declaration --= */
+int lex_next();
+int lex_getc();
+int lex_isbinaryop(token_st*);
+int lex_isunaryop(token_st*);
+int lex_valid();
+
+int prs_expect_char(char);
+int prs_binary();
+int prs_expr();
+int prs_primary();
+int prs_unary();
+int prs_pst(int);
+
+int sym_hasid(token_st*);
+int sym_hastype(token_st*);
+ 
+/* =---- lex ----= */ 
+ 
 /* lex module (vars & funcs) */
 token_st lex_token;
 FILE    *lex_fp;
@@ -86,6 +90,10 @@ int lex_load_file(const char *filename) {
     return 0;
 }
 
+int lex_valid() {
+    return lex_token.tk_class > 0;
+}
+
 int lex_isspace(char c) {
     return c == ' ' || c == '\r' || c == '\n' || c == '\t';
 }
@@ -94,7 +102,7 @@ int lex_isspace(char c) {
  * one of || && | ^ & == != < > <= >= << >> + - * / %
  */
 int lex_isbinaryop(token_st* tk) {
-    return tk->tk_class >= BINARY_OP_START && tk->tk_class <= BINARY_OP_END;
+    return tk->tk_class >= BINARY_OP_BEGIN && tk->tk_class <= BINARY_OP_END;
 }
 
 /***
@@ -167,7 +175,7 @@ int lex_next() {
                     }
                 }
             }
-            else lex_unget(c);
+            else lex_unget('/');
         }
     }
     
@@ -197,7 +205,7 @@ int lex_next() {
     
     /* single char operators / delimiters */
     buf[0] = c = lex_peek(); buf[1] = 0;
-    #define yy(u, v)
+    #define yy(u, v, x, y)
     #define zz(tk_class_, tk_char_) xx(tk_class_, tk_char_, 0, 0)
     #define xx(tk_class_, tk_char_, u, v) \
         if(c == tk_char_)  \
@@ -273,8 +281,8 @@ void lex_print_token(token_st *token) {
     #undef xx
     
     #define yy xx
-    #define zz xx
-    #define xx(tk_class_, u) \
+    #define zz(tk_class_, u) xx(tk_class_, u, 0, 0)
+    #define xx(tk_class_, u, v, z) \
         if(token->tk_class == tk_class_) { \
             assert(selected == 0); \
             selected = 1; \
@@ -296,10 +304,13 @@ void lex_init() {
 
 /* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
 
+#define PT_FUNC fprintf(stderr, "In %s()\n", __FUNCTION__);
+
 int prs_prec[256];
 int prs_asso[256];
 
 void prs_init() {
+    #define zz(u, v)
     #define xx yy
     #define yy(tk_class, u, asso_, prec_) \
         prs_prec[tk_class] = prec_; \
@@ -307,10 +318,18 @@ void prs_init() {
     #include "operators.h"
     #undef xx
     #undef yy
+    #undef zz
+}
+
+int prs_expect_char(char c) {
+    assert(lex_token.tk_str[0] == c);
+    return 0;
 }
 
 int prs_expr() {
-    prs_binary();
+    PT_FUNC
+    
+    prs_binary(prs_prec[TK_OP_ASSIGN]);
     return 0;
 }
 
@@ -325,12 +344,15 @@ int prs_expr() {
 */
 
 int prs_binary(int k) {
+    fprintf(stderr, "In prs_binary(k=%d)\n", k);
+    
     int i;
     prs_unary();
-    for(i = prec[lex_token.tk_class]; i >= k; i--) {
+    for(i = prs_prec[lex_token.tk_class]; lex_valid() && i >= k; i--) {
         /* parse from high precedence to low precedence */
         /* TODO: manage && || execution flow */
-        while(prec[lex_token.tk_class] == i) {
+        printf("lex_token = (\"%s\", %d)\n", lex_token.tk_str, prs_prec[lex_token.tk_class]);
+        while(lex_valid() && prs_prec[lex_token.tk_class] == i) {
             lex_next();
             prs_binary(i+1);
         }
@@ -348,12 +370,14 @@ int prs_binary(int k) {
 */
 
 int prs_unary() {
+    PT_FUNC
+    
     if(lex_token.tk_class == TK_OP_SIZEOF) {
         lex_next(); 
         if(lex_token.tk_str[0] == '(') {
             /* => sizeof '(' type-name ')' */
             lex_next();
-            if(!sym_has(&lex_token))
+            if(!sym_hastype(&lex_token))
                 fexit("expect `type-name`.");
             else {
                 lex_next();
@@ -366,7 +390,7 @@ int prs_unary() {
     }
     else if(lex_token.tk_str[0] == '(') {
         lex_next();
-        if(sym_has(&lex_token)) {
+        if(sym_hastype(&lex_token)) {
             /* => '(' type-name ')' unary-expression */
             lex_next();
             prs_expect_char(')'); lex_next();
@@ -383,11 +407,13 @@ int prs_unary() {
              prs_pst(1);
         }
     }
-    else {
+    else if(lex_isunaryop(&lex_token)) {
         /* => unary-operator unary-expression */
-        lex_isunaryop(&lex_token);
         lex_next();
         prs_unary();
+    }
+    else {
+        prs_pst(0);
     }
     return 0;
 }
@@ -406,10 +432,13 @@ int prs_unary() {
 */
 
 int prs_pst(int passed_primary/* placeholder for primary-expression */) {
+    PT_FUNC
+    
     if(!passed_primary)
         prs_primary();
     while(1) {
         /* TODO: parse postfix-operator */
+        if(!lex_valid()) break;
         if(lex_token.tk_str[0] == '[') {
             /* => '[' expression ']' */
             lex_next();
@@ -446,13 +475,17 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
 */
 
 int prs_primary() {
+    PT_FUNC
+
     if(lex_token.tk_class == TK_IDENTIFIER) {
+        printf("prs_primary[IDENTIFIER=%s]\n", lex_token.tk_str);
         lex_next();
     }
-    else if(len_token.tk_class == TK_CONST_INT) {
+    else if(lex_token.tk_class == TK_CONST_INT) {
+        printf("prs_primary[CONST=%s]\n", lex_token.tk_str);
         lex_next();
     }
-    else if(len_token.tk_str[0] == '(') {
+    else if(lex_token.tk_str[0] == '(') {
         lex_next();
         prs_expr();
         lex_next();
@@ -461,6 +494,21 @@ int prs_primary() {
     }
     else 
         fexit("Unexpected token");
+    
+    fprintf(stderr, "prs_primary() ends\n");
+    
+    return 0;
+}
+
+/* =---- Symbol manager ----= */
+
+int sym_hasid(token_st *tk) {
+    /* TODO */
+    return 1;
+}
+
+int sym_hastype(token_st *tk) {
+    /* TODO */
     return 0;
 }
 
@@ -470,9 +518,8 @@ void init(int argc, char **argv) {
     lex_init();
 }
 
-void test_lex(int argc, char **argv) {
-    assert(argc == 2);
-    lex_load_file(argv[1]);
+void test_lex(const char *filename) {
+    lex_load_file(filename);
     while(1) {
         int n = lex_next();
         if(n != 0) return;
@@ -480,8 +527,19 @@ void test_lex(int argc, char **argv) {
     }
 }
 
+void test_binary(char *filename) {
+    lex_load_file(filename);
+    lex_next();
+    
+    prs_init();
+    prs_expr();
+}
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
-    test_lex(argc, argv);
+    if(argc == 3 && strcmp("-l", argv[1]) == 0)
+        test_lex(argv[2]);
+    if(argc == 3 && strcmp("-b", argv[1]) == 0)
+        test_binary(argv[2]);
 }
