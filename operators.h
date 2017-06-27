@@ -30,6 +30,17 @@ xx(TK_OP_BNOT,      '~',	ASSO_L,     14)
 xx(TK_OP_REF,       '.',	ASSO_L,     0)
 
 xx(TK_OP_ASSIGN,    '=',	ASSO_R,     2)
+yy(TK_OP_ASSIGN_ADD,    "+=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_DEL,    "-=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_MUL,    "*=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_DIV,    "/=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_MOD,    "%=",   ASSO_R,     2)
+/// Not support now. For lexer doesn't supports op of more than 2 chars
+//yy(TK_OP_ASSIGN,    "<<=",   ASSO_R,     2)
+//yy(TK_OP_ASSIGN,    ">>=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_BAND,    "&=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_BXOR,    "^=",   ASSO_R,     2)
+yy(TK_OP_ASSIGN_BOR,     "|=",   ASSO_R,     2)
 
 /* delimiers */
 zz(TK_DELIMITER,    '[')
@@ -46,4 +57,9 @@ zz(TK_DELIMITER,    ':')
 #ifndef BINARY_OP_BEGIN
 #define BINARY_OP_BEGIN     TK_OP_LAND
 #define BINARY_OP_END       TK_OP_GT
+#endif
+
+#ifndef ASSIGN_OP_BEGIN
+#define ASSIGN_OP_BEGIN     TK_OP_ASSIGN
+#define ASSIGN_OP_END       TK_OP_ASSIGN_BOR
 #endif

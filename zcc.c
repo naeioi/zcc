@@ -56,9 +56,12 @@ int lex_next();
 int lex_getc();
 int lex_isbinaryop(token_st*);
 int lex_isunaryop(token_st*);
+int lex_isassignop(token_st*);
 int lex_valid();
 
 int prs_expect_char(char);
+int prs_expect_class(tk_class_en);
+/* -- expr -- */
 int prs_binary();
 int prs_expr();
 int prs_primary();
@@ -66,6 +69,8 @@ int prs_unary();
 int prs_pst(int);
 int prs_assign();
 int prs_cond();
+/* -- stmt -- */
+int prs_stmt();
 
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
@@ -121,6 +126,15 @@ int lex_isunaryop(token_st *tk) {
         tk->tk_class == TK_OP_ADD   ||
         tk->tk_class == TK_OP_DEL   ||
         tk->tk_class == TK_OP_LNOT;
+}
+
+/***
+ * one of = += -=  *=  /=  %=  <<= >>=  &=  ^=  |=
+ * >>= <<= not currently supported.
+ */
+int lex_isassignop(token_st* tk) {
+    return tk->tk_class >= ASSIGN_OP_BEGIN && tk->tk_class <= ASSIGN_OP_END;
+        
 }
 
 int lex_peek() {
@@ -202,6 +216,7 @@ int lex_next() {
         #undef zz
         
         if(lex_token.tk_class) { 
+            lex_getc();
             return 0;
         }
     }
@@ -338,6 +353,13 @@ int prs_expect_char(char c) {
     return 0;
 }
 
+int prs_expect_class(tk_class_en tk_class) {
+    assert(lex_token.tk_class == tk_class);
+    return 0;
+}
+
+/* =-- Expressions --= */
+
 /***
 expression:
     assignment-expression { , assignment-expression }
@@ -348,7 +370,7 @@ int prs_expr() {
     
     //prs_binary(prs_prec[TK_OP_ASSIGN]);
     prs_assign();
-    while(lex_isvalid() && lex_token.tk_str[0] == ',') {
+    while(lex_valid() && lex_token.tk_str[0] == ',') {
         PT_PRT_IND
         fprintf(stderr, "operator[,]\n");
         
@@ -379,12 +401,11 @@ int prs_assign() {
     PT_FUNC
     
     prs_cond();
-    while(lex_isvalid() && lex_isassign(&lex_token)) {
-        lex_next();
-        
+    if(lex_valid() && lex_isassignop(&lex_token)) {
         PT_PRT_IND
         fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
         
+        lex_next();
         prs_assign();
     }
     
@@ -401,8 +422,8 @@ int prs_cond() {
     PRS_FUNC_BG
     PT_FUNC
     
-    prs_binary(prs_prec[TK_OP_ASSIGN]);
-    if(lex_isvalid() && lex_token.tk_str[0] == ':') {
+    prs_binary(prs_prec[TK_OP_ASSIGN]+1);
+    if(lex_valid() && lex_token.tk_str[0] == ':') {
         PT_PRT_IND
         fprintf(stderr, "operator[?:]\n");
         
@@ -436,7 +457,9 @@ int prs_binary(int k) {
     prs_unary();
     for(i = prs_prec[lex_token.tk_class]; lex_valid() && i >= k; i--) {
         /* parse from high precedence to low precedence */
-        /* TODO: manage && || execution flow */
+        /* TODO: 1. manage && || execution flow 
+                 2. Possibly handle assignment
+        */
         while(lex_valid() && prs_prec[lex_token.tk_class] == i) {
             
             PT_PRT_IND
@@ -502,6 +525,9 @@ int prs_unary() {
     }
     else if(lex_isunaryop(&lex_token)) {
         /* => unary-operator unary-expression */
+        PT_PRT_IND
+        fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
+        
         lex_next();
         prs_unary();
     }
@@ -517,8 +543,8 @@ int prs_unary() {
  postfix-expression:
     primary-expression { postfix-operator }
  postfix-operator:
-    '[' expression ']'
-    '(' expression ')'
+    '[' expression ']' // array index.   e.g. a[0]
+    '(' expression ')' // function call. e.g. foo(0)
     . identifier
     -> identifier
     ++
@@ -549,19 +575,31 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
             prs_expect_char(')'); lex_next();
         }
         else if(lex_token.tk_str[0] == '.') {
+            PT_PRT_IND
+            fprintf(stderr, "operator[.]\n");
+            
             lex_next();
             sym_hasid(&lex_token);
             lex_next();
         }
         else if(lex_token.tk_class == TK_OP_DEREF) {
+            PT_PRT_IND
+            fprintf(stderr, "operator[->]\n");
+            
             lex_next();
             sym_hasid(&lex_token);
             lex_next();
         }
         else if(lex_token.tk_class == TK_OP_INC) {
+            PT_PRT_IND
+            fprintf(stderr, "operator[T++]\n");
+            
             lex_next();
         }
         else if(lex_token.tk_class == TK_OP_DEC) {
+            PT_PRT_IND
+            fprintf(stderr, "operator[T--]\n");
+            
             lex_next();
         }
         else break;
@@ -599,10 +637,196 @@ int prs_primary() {
         prs_expect_char(')');
         lex_next();
     }
-    else 
-        fexit("Unexpected token");
+    else {
+        PT_PRT_IND
+        fexit("In primary(): Unexpected token");
+    }
     
     PRS_FUNC_ED
+    return 0;
+}
+
+/* =-- Statements --= */
+
+/***
+statement:
+    ID : statement
+    case constant-expression : statement
+    default : statement
+    [ expression ] ;
+    if '(' expression ')' statement
+    if '(' expression ')' statement else statement
+    switch '(' expression ') ' statement
+    while '(' expression ') ' statement
+    do statement while '(' expression ')' ;
+    for '(' [ expression ] ; [ expression ] ; [ expression ] ')' statement
+    break ;
+    continue ;
+    goto ID ;
+    return  [ expression ] ;
+    compound-statement
+compound-statement:
+    '{' { declaration } { statement } '}'
+    
+Note:
+    Seems like declaration is only allowed at the beginning of the block.
+    This is subject to change but leave it for now.
+*/
+
+int prs_stmt() {
+    PRS_FUNC_BG
+    PT_FUNC
+    
+    if(sym_islabel(&lex_token)) {
+        /* => ID : statement */
+        PT_PRT_IND
+        fpritnf(stderr, "[label=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char(':'); lex_next();
+        prs_stmt();
+    }
+    else if(lex_token.tk_class == TK_CASE) {
+        /* => case constant-expression : statement */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expr();
+        prs_expect_char(':'); prs_next();
+        prs_stmt();
+    }
+    else if(lex_token.tk_class == TK_DEFAULT) {
+        /* => default : statement */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char(':');
+        prs_stmt();
+    }
+    else if(lex_token.tk_class == TK_IF) {
+        /* => if '(' expression ')' statement
+         * => if '(' expression ')' statement else statement
+         */
+         PT_PRT_IND
+         fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+         
+         lex_next();
+         prs_expect_char('('); lex_next();
+         prs_expr();
+         prs_expect_char(')'); lex_next();
+         
+         prs_stmt();
+         if(lex_valid() && lex_token.tk_class == TK_ELSE) {
+            PT_PRT_IND
+            fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+            
+            lex_next();
+            prs_stmt();
+         }
+    }
+    else if(lex_token.tk_class == TK_SWITCH) {
+        /* => switch '(' expression ') ' statement */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char('('); lex_next();
+        prs_expr();
+        prs_expect_char(')'); lex_next();
+        
+        prs_stmt();
+    }
+    else if(lex_token.tk_class == TK_WHILE) {
+        /* => while '(' expression ') ' statement */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char('('); lex_next();
+        prs_expr();
+        prs_expect_char(')'); lex_next();
+        
+        prs_stmt();
+    }
+    else if(lex_token.tk_class == TK_DO) {
+        /* => do statement while '(' expression ')'; */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_stmt();
+        prs_expect_class(TK_WHILE); lex_next();
+        prs_expect_char('('); lex_next();
+        prs_expr();
+        prs_expect_char(')'); lex_next();
+        prs_expect_char(';'); lex_next();
+    }
+    else if(lex_token.tk_class == TK_FOR) {
+        /* => for '(' [ expression ] ; [ expression ] ; [ expression ] ')' statement */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char('('); lex_next();
+        if(lex_token.tk_str[0] != ';') {
+            prs_expr();
+        }
+        prs_expect_char(';'); lex_next();
+        if(lex_token.tk_str[0] != ';') {
+            prs_expr();
+        }
+        prs_expect_char(';'); lex_next();
+        if(lex_token.tk_str[0] != ')') {
+            prs_expr();
+        }
+        prs_expect_char(')'); lex_next();
+        
+        prs_stmt();
+    }
+    else if(lex_token.tk_class == TK_BREAK) {
+        /* => break ; */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char(';'); lex_next();
+    }
+    else if(lex_token.tk_class == TK_CONTINUE) {
+        /* => continue ; */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_char(';'); lex_next();
+    }
+    else if(lex_token.tk_class == TK_GOTO) {
+        /* => break ; */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        prs_expect_class(TK_IDENTIIER); lex_next();
+        prs_expect_char(';'); lex_next();
+    }
+    else if(lex_token.tk_class == TK_RETURN) {
+        /* => return  [ expression ] ; */
+        PT_PRT_IND
+        fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
+        
+        lex_next();
+        if(lex_token.tk_str[0] != ';') {
+            prs_expr();
+        }
+        prs_expect_char(';'); lex_next();
+    }
+    else if(lex_token.tk_str[0] == '{') {
+        /* => '{' { declaration } { statement } '}' */
+        /* TODO: need declaration */
+    }
+    
+    PRS_FUNC_ED;
     return 0;
 }
 
