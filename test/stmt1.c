@@ -5,5 +5,7 @@ for(i=0; i < 100; i++) {
             for(j = 2; j * i < 100; j++) 
                 vis[i*j] = 1;
         }
+        a = b + c;
+        break;
     }
 }

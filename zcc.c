@@ -873,10 +873,108 @@ int prs_stmt() {
     return 0;
 }
 
+/* =-- Statements --= */
+
 /***
  * { declaration }
  */
 int prs_decls() {
+    /* TODO: forbid nested function declaration */
+    while(sym_hastype(&lex_token)) {
+        prs_decl();
+    }
+    return 0;
+}
+
+/***
+declaration:
+    declaration-specifiers init-declarator { , init-declarator } ;
+    declaration-specifiers func-declarator compound-statement
+    
+init-declarator:
+    identifier
+    identifier = assignment-expression
+    
+func-declarator:
+    identifer '(' parameter-list ')'
+    
+parameter-list:
+    parameter { , parameter } [ , ... ]
+
+parameter:
+    declaration-specifiers identifier
+*/
+int prs_decl() {
+    /* declaration-specifiers => 
+     *   int
+     *   int*
+     */
+     
+    PRS_FUNC_BG
+    PT_FUNC 
+     
+    if(lex_token.tk_class == TK_INT) {
+        lex_next();
+        
+        PT_PRT_IND;
+        if(lex_token.tk_str[0] == '*') {
+            lex_next();
+            fprintf(stderr, "type[int*]\n");
+        }
+        else {
+            fprintf(stderr, "type[int]\n");
+        }
+    }
+    
+    /* => init-declarator { , init-declarator } ; 
+     * => identifier { ... }
+     *    identifier = assignment-expression  { ... }
+     */
+    
+    do {
+        prs_expect_class(TK_IDENTIFIER); 
+        
+        PT_PRT_IND
+        fprintf(stderr, "%s[name='%s']\n", lex_token.tk_str[0] == '(' ? "func" : "var", lex_token.tk_str);
+        
+        lex_next();
+        if(lex_token.tk_class == TK_ASSIGN) {
+            PT_PRT_IND
+            fprintf(stderr, "operator[=]\n");
+            lex_next();
+            
+            prs_assign();
+        }
+    } while(lex_token.tk_str[0] == ',');
+    
+    if(lex_token.tk_str[0] == '(') {
+        /* => declaration-specifiers func-declarator compound-statement
+         * => declaration-specifiers identifer '(' parameter-list ')'
+         * where specifier & identifier are already parsed
+         *
+         * parameter-list: parameter { , parameter } [ , ... ]
+         * parameter: declaration-specifiers identifier
+         */
+         lex_next();
+         
+         do {
+             prs_decl_spec();
+             
+             prs_expect_class(TK_IDENTIFIER); 
+             PT_PRT_IND
+             fprintf(stderr, "para[name='%s']\n", lex_token.tk_str);
+             lex_next();
+         } while(lex_token.tk_str[0] == ',');
+         
+         prs_expect_char(')'); lex_next();
+         prs_expect_char('{'); lex_next();
+         
+         prs_stmt();
+    }
+    else 
+        prs_expect_char(';'); lex_next();
+    
+    PRS_FUNC_ED
     return 0;
 }
 
