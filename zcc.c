@@ -15,19 +15,24 @@ enum lex_ecode_en {
 };
 
 typedef enum tk_class_en {
+    TK_PLACEHOLDER = 1,
     // keywords 
+    #define xx(tk_class, u) tk_class,
+    #include "keywords.h"
+    #undef xx
+    /* 
     TK_INT = 1,
     TK_CHAR,
     TK_VOID,
     TK_RETURN,
     TK_CONST,
+    */
     // constant 
     TK_CONST_INT,
     TK_CONST_CHAR,
     TK_CONST_STRING,
     // operator / delimiter 
     TK_OP,
-    TK_OP_SIZEOF,
     #define xx(tk_class, u, v, w) tk_class,
     #define yy(tk_class, u, v, w) tk_class,
     #define zz(tk_class, u) 
@@ -71,9 +76,13 @@ int prs_assign();
 int prs_cond();
 /* -- stmt -- */
 int prs_stmt();
+/* -- decl -- */
+int prs_decls();
+
 
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
+int sym_islabel(token_st*);
 
 void fexit(const char *format, ...);
  
@@ -196,6 +205,10 @@ int lex_next() {
             else lex_unget('/');
         }
     }
+    
+    /* eat space after comment */
+    while((c = lex_peek()) != -1 && lex_isspace(c)) lex_getc();
+    if(c == -1) return ELEX_FEOF;
     
     if(lex_peek() == -1) return -1;
     
@@ -327,8 +340,8 @@ int _prs_depth = -1;
 #define PRS_FUNC_BG _prs_depth++;
 #define PRS_FUNC_ED _prs_depth--;
 #define PT_PRT_IND \
-    int _i = _prs_depth; \
-    while(_i--) fprintf(stderr, "- "); 
+    { int _i = _prs_depth; \
+    while(_i--) fprintf(stderr, "- "); }
 #define PT_FUNC \
     PT_PRT_IND \
     fprintf(stderr, "In %s()\n", __FUNCTION__);
@@ -336,6 +349,9 @@ int _prs_depth = -1;
 int prs_prec[256];
 int prs_asso[256];
 
+/***
+ * Initialize operator precedence & association 
+ */
 void prs_init() {
     #define zz(u, v)
     #define xx yy
@@ -348,7 +364,13 @@ void prs_init() {
     #undef zz
 }
 
-int prs_expect_char(char c) {
+#define prs_expect_char(c) _prs_expect_char(c, __FUNCTION__, __LINE__)
+
+int _prs_expect_char(char c, const char *fname, int linen) {
+    if(lex_token.tk_str[0] != c) {
+        fprintf(stderr, "\n=== In %s() line %d ===\n", fname, linen);
+        fprintf(stderr, "Expect '%c' but encounter '%c'\n", c, lex_token.tk_str[0]);
+    }
     assert(lex_token.tk_str[0] == c);
     return 0;
 }
@@ -389,7 +411,7 @@ assign-operator:
     one of = += -=  *=  /=  %=  <<= >>=  &=  ^=  |=
     
 Note:
-    It's hard to choose from one of the production. 
+    It's hard to choose from one of the productions. 
     So we merge them into 
     => conditional-expression assign-operator assignment-expression
     
@@ -680,7 +702,7 @@ int prs_stmt() {
     if(sym_islabel(&lex_token)) {
         /* => ID : statement */
         PT_PRT_IND
-        fpritnf(stderr, "[label=%s]\n", lex_token.tk_str);
+        fprintf(stderr, "[label=%s]\n", lex_token.tk_str);
         
         lex_next();
         prs_expect_char(':'); lex_next();
@@ -693,7 +715,7 @@ int prs_stmt() {
         
         lex_next();
         prs_expr();
-        prs_expect_char(':'); prs_next();
+        prs_expect_char(':'); lex_next();
         prs_stmt();
     }
     else if(lex_token.tk_class == TK_DEFAULT) {
@@ -807,7 +829,7 @@ int prs_stmt() {
         fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
         
         lex_next();
-        prs_expect_class(TK_IDENTIIER); lex_next();
+        prs_expect_class(TK_IDENTIFIER); lex_next();
         prs_expect_char(';'); lex_next();
     }
     else if(lex_token.tk_class == TK_RETURN) {
@@ -824,9 +846,37 @@ int prs_stmt() {
     else if(lex_token.tk_str[0] == '{') {
         /* => '{' { declaration } { statement } '}' */
         /* TODO: need declaration */
+        PT_PRT_IND
+        fprintf(stderr, "stmt[{}]\n");
+        
+        lex_next();
+        
+        prs_decls();
+        while(lex_token.tk_str[0] != '}') {
+            prs_stmt();
+        }
+        
+        prs_expect_char('}'); lex_next(); 
+        
+        PT_PRT_IND
+        fprintf(stderr, "prs_stmt[leave]\n");
+    }
+    else if(lex_token.tk_str[0] != '}') {
+        /* => [expression] ;
+         * (single expression)
+         */
+        prs_expr();
+        prs_expect_char(';'); lex_next(); 
     }
     
     PRS_FUNC_ED;
+    return 0;
+}
+
+/***
+ * { declaration }
+ */
+int prs_decls() {
     return 0;
 }
 
@@ -838,6 +888,11 @@ int sym_hasid(token_st *tk) {
 }
 
 int sym_hastype(token_st *tk) {
+    /* TODO */
+    return 0;
+}
+
+int sym_islabel(token_st* tk) {
     /* TODO */
     return 0;
 }
@@ -865,6 +920,14 @@ void test_binary(char *filename) {
     prs_expr();
 }
 
+void test_stmt(char *filename) {
+    lex_load_file(filename);
+    lex_next();
+    
+    prs_init();
+    prs_stmt();
+}
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -872,4 +935,6 @@ int main(int argc, char **argv)
         test_lex(argv[2]);
     if(argc == 3 && strcmp("-b", argv[1]) == 0)
         test_binary(argv[2]);
-}
+    if(argc == 3 && strcmp("-s", argv[1]) == 0)
+        test_stmt(argv[2]);
+}   
