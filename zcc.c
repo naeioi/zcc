@@ -78,7 +78,8 @@ int prs_cond();
 int prs_stmt();
 /* -- decl -- */
 int prs_decls();
-
+int prs_decl();
+int prs_decl_spec();
 
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
@@ -269,6 +270,20 @@ int lex_next() {
     }
     
     /* literal string */
+    c = lex_peek();
+    if(c == '"') {
+        lex_getc(); /* eat " */
+        
+        lex_token.tk_class = TK_CONST_STRING;
+        do {
+            *p++ = lex_getc();
+            c = lex_peek();
+        } while(c != '"');
+        *p++ = 0;
+        
+        lex_getc(); /* eat " */
+        return 0;
+    }
     
     /* identifier/keywords */
     c = lex_peek();
@@ -303,7 +318,7 @@ void lex_print_token(token_st *token) {
         if(token->tk_class == tk_class_) { \
             assert(selected == 0); \
             selected = 1; \
-            printf("(" #tk_class_ ", \"%s\"", token->tk_str); \
+            printf("(%-15s, \"%s\"", #tk_class_, token->tk_str); \
             if(token->tk_class == TK_CONST_INT) \
                 printf(", %d)\n", token->value->i); \
             else \
@@ -318,7 +333,7 @@ void lex_print_token(token_st *token) {
         if(token->tk_class == tk_class_) { \
             assert(selected == 0); \
             selected = 1; \
-            printf("(" #tk_class_ ", \"%s\")\n", token->tk_str); \
+            printf("(%-15s, \"%s\")\n", #tk_class_, token->tk_str); \
             return; \
         }
     #include "operators.h"
@@ -364,7 +379,8 @@ void prs_init() {
     #undef zz
 }
 
-#define prs_expect_char(c) _prs_expect_char(c, __FUNCTION__, __LINE__)
+#define prs_expect_char(c)  _prs_expect_char (c, __FUNCTION__, __LINE__)
+#define prs_expect_class(c) _prs_expect_class(c, #c, __FUNCTION__, __LINE__)
 
 int _prs_expect_char(char c, const char *fname, int linen) {
     if(lex_token.tk_str[0] != c) {
@@ -375,7 +391,11 @@ int _prs_expect_char(char c, const char *fname, int linen) {
     return 0;
 }
 
-int prs_expect_class(tk_class_en tk_class) {
+int _prs_expect_class(tk_class_en tk_class, const char *cname, const char *fname, int linen) {
+    if(lex_token.tk_class != tk_class) {
+        fprintf(stderr, "\n=== In %s() line %d ===\n", fname, linen);
+        fprintf(stderr, "Expect '%s' but encounter '%s'\n", cname, lex_token.tk_str);
+    }
     assert(lex_token.tk_class == tk_class);
     return 0;
 }
@@ -395,6 +415,7 @@ int prs_expr() {
     while(lex_valid() && lex_token.tk_str[0] == ',') {
         PT_PRT_IND
         fprintf(stderr, "operator[,]\n");
+        lex_next();
         
         prs_assign();
     }
@@ -652,6 +673,11 @@ int prs_primary() {
         printf("prs_primary[CONST=%s]\n", lex_token.tk_str);
         lex_next();
     }
+    else if(lex_token.tk_class == TK_CONST_STRING) {
+        PT_PRT_IND
+        fprintf(stderr, "prs_primary[CONST=\"%s\"]\n", lex_token.tk_str);
+        lex_next();
+    }
     else if(lex_token.tk_str[0] == '(') {
         lex_next();
         prs_expr();
@@ -859,7 +885,7 @@ int prs_stmt() {
         prs_expect_char('}'); lex_next(); 
         
         PT_PRT_IND
-        fprintf(stderr, "prs_stmt[leave]\n");
+        fprintf(stderr, "prs_stmt[leave], next lex_token=%s\n", lex_token.tk_str);
     }
     else if(lex_token.tk_str[0] != '}') {
         /* => [expression] ;
@@ -880,9 +906,17 @@ int prs_stmt() {
  */
 int prs_decls() {
     /* TODO: forbid nested function declaration */
+    PRS_FUNC_BG
+    PT_FUNC
+    
     while(sym_hastype(&lex_token)) {
         prs_decl();
+        fprintf(stderr, "\n");
     }
+    
+    //fprintf(stderr, "%s\n", lex_token.tk_str);
+    
+    PRS_FUNC_ED
     return 0;
 }
 
@@ -904,48 +938,44 @@ parameter-list:
 parameter:
     declaration-specifiers identifier
 */
-int prs_decl() {
-    /* declaration-specifiers => 
-     *   int
-     *   int*
-     */
-     
+int prs_decl() { 
     PRS_FUNC_BG
     PT_FUNC 
      
-    if(lex_token.tk_class == TK_INT) {
-        lex_next();
-        
-        PT_PRT_IND;
-        if(lex_token.tk_str[0] == '*') {
-            lex_next();
-            fprintf(stderr, "type[int*]\n");
-        }
-        else {
-            fprintf(stderr, "type[int]\n");
-        }
-    }
+    prs_decl_spec();
     
     /* => init-declarator { , init-declarator } ; 
      * => identifier { ... }
      *    identifier = assignment-expression  { ... }
      */
     
-    do {
-        prs_expect_class(TK_IDENTIFIER); 
+    while(1) {
+        if(lex_token.tk_str[0] == '*') {
+            PT_PRT_IND
+            fprintf(stderr, "operator[*]\n");
+            lex_next();
+        }
+        else
+            prs_expect_class(TK_IDENTIFIER); 
+        
+        char vname[255];
+        strcpy(vname, lex_token.tk_str);
+        lex_next();
         
         PT_PRT_IND
-        fprintf(stderr, "%s[name='%s']\n", lex_token.tk_str[0] == '(' ? "func" : "var", lex_token.tk_str);
+        fprintf(stderr, "%s[name='%s']\n", lex_token.tk_str[0] == '(' ? "func" : "var", vname);
         
-        lex_next();
-        if(lex_token.tk_class == TK_ASSIGN) {
+        if(lex_token.tk_class == TK_OP_ASSIGN) {
             PT_PRT_IND
             fprintf(stderr, "operator[=]\n");
             lex_next();
             
             prs_assign();
         }
-    } while(lex_token.tk_str[0] == ',');
+        
+        if(lex_token.tk_str[0] == ',') lex_next();
+        else break;
+    }
     
     if(lex_token.tk_str[0] == '(') {
         /* => declaration-specifiers func-declarator compound-statement
@@ -957,22 +987,54 @@ int prs_decl() {
          */
          lex_next();
          
-         do {
-             prs_decl_spec();
-             
-             prs_expect_class(TK_IDENTIFIER); 
-             PT_PRT_IND
-             fprintf(stderr, "para[name='%s']\n", lex_token.tk_str);
-             lex_next();
-         } while(lex_token.tk_str[0] == ',');
+         if(lex_token.tk_str[0] != ')') {
+             while(1) {
+                 prs_decl_spec();
+                 
+                 if(lex_token.tk_str[0] == '*') {
+                    PT_PRT_IND
+                    fprintf(stderr, "operator[*]\n");
+                    lex_next();
+                 }
+                 else
+                     prs_expect_class(TK_IDENTIFIER); 
+                
+                 PT_PRT_IND
+                 fprintf(stderr, "para[name='%s']\n", lex_token.tk_str);
+                 lex_next();
+                 
+                 if(lex_token.tk_str[0] == ',') lex_next();
+                 else break;
+             }
+         }
          
          prs_expect_char(')'); lex_next();
-         prs_expect_char('{'); lex_next();
+         prs_expect_char('{'); /* detect { but dont eat it. leave it to prs_stmt() */
          
          prs_stmt();
     }
-    else 
+    else {
         prs_expect_char(';'); lex_next();
+    }
+    
+    PRS_FUNC_ED
+    return 0;
+}
+
+/* declaration-specifiers => 
+ *   int
+ */
+
+int prs_decl_spec() {
+    PRS_FUNC_BG
+    PT_FUNC 
+     
+    if(lex_token.tk_class == TK_INT) {
+        lex_next();
+        
+        PT_PRT_IND
+        fprintf(stderr, "type[int]\n");
+    }
     
     PRS_FUNC_ED
     return 0;
@@ -987,6 +1049,7 @@ int sym_hasid(token_st *tk) {
 
 int sym_hastype(token_st *tk) {
     /* TODO */
+    if(tk->tk_class == TK_INT) return 1;
     return 0;
 }
 
@@ -1026,6 +1089,22 @@ void test_stmt(char *filename) {
     prs_stmt();
 }
 
+void test_decl(char *filename) {
+    lex_load_file(filename);
+    lex_next();
+    
+    prs_init();
+    prs_decl();
+}
+
+void test_decls(char *filename) {
+    lex_load_file(filename);
+    lex_next();
+    
+    prs_init();
+    prs_decls();
+}
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -1035,4 +1114,8 @@ int main(int argc, char **argv)
         test_binary(argv[2]);
     if(argc == 3 && strcmp("-s", argv[1]) == 0)
         test_stmt(argv[2]);
+    if(argc == 3 && strcmp("-d", argv[1]) == 0)
+        test_decl(argv[2]);
+    if(argc == 3 && strcmp("-ds", argv[1]) == 0)
+        test_decls(argv[2]);
 }   
