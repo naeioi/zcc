@@ -64,22 +64,25 @@ int _prs_expect_class(tk_class_en tk_class, const char *cname, const char *fname
 expression:
     assignment-expression { , assignment-expression }
 */
-int prs_expr() {
+var_st* prs_expr() {
     PRS_FUNC_BG
     PT_FUNC
     
+    var_st *r;
+    
     //prs_binary(prs_prec[TK_OP_ASSIGN]);
-    prs_assign();
+    r = prs_assign();
     while(lex_valid() && lex_token.tk_str[0] == ',') {
         PT_PRT_IND
         fprintf(stderr, "operator[,]\n");
         lex_next();
         
-        prs_assign();
+        r = prs_assign();
     }
     
     PRS_FUNC_ED
-    return 0;
+    
+    return r;
 }
 
 /***
@@ -97,21 +100,27 @@ Note:
     This leads to incorrect expresstion like a + b = c gets accepted
     But we could leave error detection later to semantic stage
 */
-int prs_assign() {
+var_st* prs_assign() {
     PRS_FUNC_BG
     PT_FUNC
     
-    prs_cond();
+    var_st* r, t;
+    
+    r = prs_cond();
     if(lex_valid() && lex_isassignop(&lex_token)) {
         PT_PRT_IND
         fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
         
+        /* TODO: support assignment other than = */
         lex_next();
-        prs_assign();
+        t = prs_assign();
+        /* TODO: check if r is a lvalue */
+        assert(r->lvalue == 1);
+        gen_emit(IR_ASSIGN, r, t);
     }
     
     PRS_FUNC_ED
-    return 0;
+    return r;
 }
 
 /***
@@ -119,14 +128,18 @@ conditional-expression:
     binary-expression [ ? expression : conditional-expression ]
 */
 
-int prs_cond() {
+var_st* prs_cond() {
     PRS_FUNC_BG
     PT_FUNC
     
-    prs_binary(prs_prec[TK_OP_ASSIGN]+1);
+    var_st *r;
+    
+    r = prs_binary(prs_prec[TK_OP_ASSIGN]+1);
     if(lex_valid() && lex_token.tk_str[0] == ':') {
         PT_PRT_IND
         fprintf(stderr, "operator[?:]\n");
+        
+        /* TODO: support trinity operator, i.e. cond ? A : B; */
         
         lex_next();
         prs_expr();
@@ -135,7 +148,7 @@ int prs_cond() {
     }
     
     PRS_FUNC_ED
-    return 0;
+    return r;
 }
 
 /***
@@ -148,14 +161,18 @@ int prs_cond() {
     trick avoiding deep recursion descripted in LCC Chap.8.6
 */
 
-int prs_binary(int k) {
+var_st* prs_binary(int k) {
     PRS_FUNC_BG
     
     PT_PRT_IND
     fprintf(stderr, "In prs_binary(k=%d)\n", k);
     
+    var_st *r, *t, *u = NULL;
+    ir_op_en    ir_op;
+    tk_class_en tk_op;
+    
     int i;
-    prs_unary();
+    r = prs_unary();
     for(i = prs_prec[lex_token.tk_class]; lex_valid() && i >= k; i--) {
         /* parse from high precedence to low precedence */
         /* TODO: 1. manage && || execution flow 
@@ -166,13 +183,26 @@ int prs_binary(int k) {
             PT_PRT_IND
             fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
             
+            tk_op = lex_token.tk_class;
+            /* TODO: add support to other operators */
+            if(tk_op == TK_OP_ADD) ir_op = IR_ADD;
+            else fexit("Not supported operator %s", lex_token.tk_str);
+            
             lex_next();
-            prs_binary(i+1);
+            t = prs_binary(i+1);
+            
+            if(u == NULL) {
+                u = sym_make_temp_var();
+                gen_emit(ir_op, u, r, t);
+            }
+            else {
+                gen_emit(ir_op, u, u, t);
+            }
         }
     }
     
     PRS_FUNC_ED
-    return 0;
+    return u ? u : r;
 }
 
 /***
@@ -184,12 +214,14 @@ int prs_binary(int k) {
     sizeof '(' type-name ')'
 */
 
-int prs_unary() {
+var_st* prs_unary() {
     PRS_FUNC_BG
-    
     PT_FUNC
     
+    var_st *r = NULL;
+    
     if(lex_token.tk_class == TK_OP_SIZEOF) {
+        /* TODO */
         lex_next(); 
         if(lex_token.tk_str[0] == '(') {
             /* => sizeof '(' type-name ')' */
@@ -206,6 +238,7 @@ int prs_unary() {
             prs_unary();
     }
     else if(lex_token.tk_str[0] == '(') {
+        /* TODO */
         lex_next();
         if(sym_hastype(&lex_token)) {
             /* => '(' type-name ')' unary-expression */
@@ -225,6 +258,7 @@ int prs_unary() {
         }
     }
     else if(lex_isunaryop(&lex_token)) {
+        /* TODO */
         /* => unary-operator unary-expression */
         PT_PRT_IND
         fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
@@ -233,11 +267,11 @@ int prs_unary() {
         prs_unary();
     }
     else {
-        prs_pst(0);
+        r = prs_pst(0);
     }
     
     PRS_FUNC_ED
-    return 0;
+    return r;
 }
 
 /***
@@ -245,7 +279,6 @@ int prs_unary() {
     primary-expression { postfix-operator }
  postfix-operator:
     '[' expression ']' // array index.   e.g. a[0]
-    '(' expression ')' // function call. e.g. foo(0)
     . identifier
     -> identifier
     ++
@@ -254,13 +287,14 @@ int prs_unary() {
  Note: assume primary-expression parsed by caller and passed(?) in.
 */
 
-int prs_pst(int passed_primary/* placeholder for primary-expression */) {
+var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) {
     PRS_FUNC_BG
-    
     PT_FUNC
     
+    var_st *r = NULL;
+    
     if(!passed_primary)
-        prs_primary();
+        r = prs_primary();
     while(1) {
         /* TODO: parse postfix-operator */
         if(!lex_valid()) break;
@@ -269,11 +303,6 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
             lex_next();
             prs_expr();
             prs_expect_char(']'); lex_next();
-        }
-        else if(lex_token.tk_str[0] == '(') {
-            lex_next();
-            prs_expr();
-            prs_expect_char(')'); lex_next();
         }
         else if(lex_token.tk_str[0] == '.') {
             PT_PRT_IND
@@ -307,7 +336,8 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
     }
     
     PRS_FUNC_ED
-    return 0;
+    
+    return r;
 }
 
 /***
@@ -316,29 +346,58 @@ int prs_pst(int passed_primary/* placeholder for primary-expression */) {
     constant
     string-literal
     '(' expression ')'
+    function-call
+
+function-call:
+    identifier '(' argument-list ')'
 */
 
-int prs_primary() {
+var_st* prs_primary() {
     PRS_FUNC_BG
-
+    
+    var_st* r = NULL;
+    
     if(lex_token.tk_class == TK_IDENTIFIER) {
         PT_PRT_IND
         printf("prs_primary[IDENTIFIER=%s]\n", lex_token.tk_str);
+        
+        char *vname = dup_str(lex_token.tk_str);
         lex_next();
+        
+        if(lex_token.tk_str[0] != '(') {
+            /* => identifer */
+            r = sym_find_var(lex_token.tk_str);
+            assert(r);
+        }
+        else {
+            /* => function-call */
+            PT_PRT_IND
+            printf("prs_primary[call=%s()]\n", lex_token.tk_str);
+            lex_next();
+            
+            list_st *pars = prs_pars();
+            func_st *func = sym_find_func(vname);
+            r = sym_make_temp_var(func->rtype);
+            gen_emit(IR_CALL, r, pars);
+            
+            prs_expect_char(')'); lex_next();
+        }
     }
     else if(lex_token.tk_class == TK_CONST_INT) {
         PT_PRT_IND
         printf("prs_primary[CONST=%s]\n", lex_token.tk_str);
         lex_next();
+        r = sym_make_imm(&lex_token);
     }
     else if(lex_token.tk_class == TK_CONST_STRING) {
         PT_PRT_IND
         fprintf(stderr, "prs_primary[CONST=\"%s\"]\n", lex_token.tk_str);
         lex_next();
+        r = sym_make_imm(&lex_token);
     }
     else if(lex_token.tk_str[0] == '(') {
         lex_next();
-        prs_expr();
+        r = prs_expr();
         lex_next();
         prs_expect_char(')');
         lex_next();
@@ -349,7 +408,28 @@ int prs_primary() {
     }
     
     PRS_FUNC_ED
-    return 0;
+    return r;
+}
+
+/***
+argument-list:
+    assignment-expression { , assignment-expression }
+*/
+list_st* prs_args() {
+    PRS_FUNC_BG
+    list_st *args = make_list();
+    
+    int i = 0;
+    while(1) {
+        i++;
+        list_append(args, prs_assign());
+        if(lex_token.tk_str[0] == ',');
+        else if(lex_token.tk_str[0] == ')') break;
+        else fexit("Unexpected token");
+    }
+    
+    PRS_FUNC_ED
+    return pars;
 }
 
 /* =-- Statements --= */
@@ -540,7 +620,7 @@ int prs_stmt_return() {
     
     lex_next();
     if(lex_token.tk_str[0] != ';') {
-        prs_expr();
+        context.func->ret = prs_expr();
     }
     prs_expect_char(';'); lex_next();
     
@@ -714,7 +794,7 @@ int prs_decl() {
             lex_next();
             
             var_st *result = prs_assign();
-            emit(IR_ASSIGN, var, result);
+            gen_emit(IR_ASSIGN, var, result);
         }
         
         if(lex_token.tk_str[0] == ',') lex_next();
@@ -733,6 +813,8 @@ int prs_decl() {
          lex_next();
          
          scope_st *nscope = sym_mnp_scope();
+         func_st  *nfunc  = sym_make_func();
+         context.func = nfunc;
          
          if(lex_token.tk_str[0] != ')') {
              while(1) {
@@ -780,17 +862,21 @@ int prs_decl() {
  *   int
  */
 
-int prs_decl_spec() {
+type_st* prs_decl_spec() {
     PRS_FUNC_BG
     PT_FUNC 
+     
+    type_st* r;
      
     if(lex_token.tk_class == TK_INT) {
         lex_next();
         
         PT_PRT_IND
         fprintf(stderr, "type[int]\n");
+        
+        r = type_int;
     }
     
     PRS_FUNC_ED
-    return 0;
+    return r;
 }

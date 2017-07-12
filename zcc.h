@@ -21,6 +21,8 @@ typedef struct func_st {
     type_st *rtype;
     list_st *pars;
     list_st *insts;
+    var_st  *ret;
+    int     lvalue;
 } func_st;
 
 typedef struct list_st {
@@ -51,6 +53,13 @@ typedef struct context_st {
     func_st  *func;
     list_st  *types; /* in C, types are global */
 } context_st;
+
+typedef enum ir_op_en {
+    IR_ADD,
+    IR_SUB,
+    IR_MUL,
+    IR_DIV
+} ir_op_en;
 
 /* -- structs used for lexer -- */
 enum lex_ecode_en {
@@ -123,6 +132,7 @@ int prs_expect_class(tk_class_en);
 int prs_binary();
 int prs_expr();
 int prs_primary();
+list_st* prs_args();
 int prs_unary();
 int prs_pst(int);
 int prs_assign();
@@ -142,10 +152,17 @@ scope_st*   sym_mnp_scope(); /* make and push scope to context */
 void   sym_push_scope(scope_st*);
 void   sym_pop_scope();
 var_st*     sym_make_var(char*, type_st*);
+var_st*     sym_make_temp_var(type_st*);
+var_st*     sym_make_imm(lex_token*);
 var_st*     sym_make_par(char*, type_st*);
+func_st*    sym_make_func(char*, type_st*);
 void        sym_add_type(type_st*);
 
 void fexit(const char *format, ...);
-
+char* dup_str(char*);
 list_st* make_list();
-void*    list_append(void*);
+void*    list_append(list_st*, void*);
+
+/*==-- Macros --==*/
+#define EMIT_M_MACRO(_0,_1,_2, _3, NAME, ...) NAME
+#define gen_emit(...) EMIT_M_MACRO(__VA_ARGS__, gen_emit3, gen_emit2, gen_emit1, gen_emit0)(__VA_ARGS__)

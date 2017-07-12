@@ -62,7 +62,20 @@ var_st* sym_make_var(char* name, type_st* type) {
     return NULL;
 }
 
+var_st* sym_make_temp_var(type_st *type) {
+    /* TODO */
+}
+
+var_st* sym_make_imm(lex_token* tk) {
+    /* TODO */
+}
+
 var_st* sym_make_par(char* name, type_st* type) {
+    /* TODO */
+    return NULL;
+}
+
+func_st* sym_make_func(char* name, type_st* rtype) {
     /* TODO */
     return NULL;
 }

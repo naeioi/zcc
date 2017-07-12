@@ -19,7 +19,7 @@ list_st* make_list() {
     return list;
 }
 
-void* list_append(void* elem) {
+void* list_append(list_st*, void* elem) {
     /* TODO */
     return NULL;
 }
