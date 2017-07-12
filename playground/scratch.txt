@@ -1,0 +1,75 @@
+Func {
+    char  *name;
+    List  *pars;
+    Type  *rtype;
+    Block *entry;
+}
+
+BlockLabel {
+    Block *blk;
+    int ind;
+}
+
+Block {
+    InstList   *insts;
+    BlockLabel *exit_lb;
+}
+
+If-Block {
+    
+}
+
+===-------===
+
+if(..) {
+LabelT:
+}
+else {
+LabelF:
+}
+LabelO:
+
+if(a > b) {
+    {T insts}
+}
+else {
+    {F insts}
+}
+
+{O insts}
+
+=>
+add c a b
+cjmp c LabelT
+jmp LableF
+
+lable LabelT
+{ T insts }
+jmp LabelO
+
+label LabelF
+{ F insts }
+jmp LableO
+
+label LabelO
+{ O insts }
+
+
+===------===
+
+for(A ; B; C) {
+/* break; contunue; */
+}
+
+=>
+
+{ A }
+
+LableS:
+{ B } ^
+      |
+break--
+continue
+      | 
+{ C } V
+LableO:

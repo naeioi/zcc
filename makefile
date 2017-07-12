@@ -6,7 +6,7 @@ all: zcc
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAGS)
     
-zcc: zcc.o
+zcc: zcc.o lex.o parse.o sym.o utility.o
 	$(CC) $^ -o $@ $(CFLAGS)
 
 .PHONY: clean
