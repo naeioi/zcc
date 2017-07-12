@@ -378,7 +378,7 @@ var_st* prs_primary() {
             list_st *pars = prs_pars();
             func_st *func = sym_find_func(vname);
             r = sym_make_temp_var(func->rtype);
-            gen_emit(IR_CALL, r, pars);
+            gen_emit_call(IR_CALL, r, pars);
             
             prs_expect_char(')'); lex_next();
         }
@@ -814,7 +814,6 @@ int prs_decl() {
          
          scope_st *nscope = sym_mnp_scope();
          func_st  *nfunc  = sym_make_func();
-         context.func = nfunc;
          
          if(lex_token.tk_str[0] != ')') {
              while(1) {

@@ -19,10 +19,9 @@ typedef struct type_st {
 typedef struct func_st {
     char    *name;
     type_st *rtype;
-    list_st *pars;
+    list_st *pars; /* list of var_st */
     list_st *insts;
     var_st  *ret;
-    int     lvalue;
 } func_st;
 
 typedef struct list_st {
@@ -36,11 +35,12 @@ typedef struct var_st {
     type_st  *type;
     value_un *value;
     int      ispar; /* 0 if not parameter. otherwise parameter index. (i.e. ispar=1 for the first parameter) */
+    int     lvalue;
 } var_st;
 
 typedef struct scope_st {
     struct scope_st *up;
-    list_st *vars;
+    list_st *vars; /* list of var_st* */
 } scope_st;
 
 typedef struct label_st {
@@ -51,7 +51,8 @@ typedef struct label_st {
 typedef struct context_st {
     scope_st *scope;
     func_st  *func;
-    list_st  *types; /* in C, types are global */
+    list_st  *funcs; /* list of func_st* */
+    list_st  *types; /* list of type_st*. in C, types are global */
 } context_st;
 
 typedef enum ir_op_en {
@@ -60,6 +61,11 @@ typedef enum ir_op_en {
     IR_MUL,
     IR_DIV
 } ir_op_en;
+
+typedef struct inst_st {
+    ir_op_en op;
+    void* args[3]; /* maximum 3 args */
+} inst_st;
 
 /* -- structs used for lexer -- */
 enum lex_ecode_en {
@@ -101,6 +107,7 @@ typedef enum tk_class_en {
 typedef union value_un {
     int i;
     char c;
+    char *s;
 } value_un;
 
 typedef struct token_st {
@@ -115,6 +122,8 @@ extern context_st context;
 extern type_st    *type_int;
  
 /* =-- forward declaration --= */
+
+/* lex */
 int lex_load_file(const char *);
 void lex_print_token(token_st *);
 void lex_init();
@@ -125,18 +134,19 @@ int lex_isunaryop(token_st*);
 int lex_isassignop(token_st*);
 int lex_valid();
 
+/* parse */
 void prs_init();
 int prs_expect_char(char);
 int prs_expect_class(tk_class_en);
 /* -- expr -- */
-int prs_binary();
-int prs_expr();
-int prs_primary();
+var_st* prs_binary();
+var_st* prs_expr();
+var_st* prs_primary();
 list_st* prs_args();
-int prs_unary();
-int prs_pst(int);
-int prs_assign();
-int prs_cond();
+var_st* prs_unary();
+var_st* prs_pst(int);
+var_st* prs_assign();
+var_st* prs_cond();
 /* -- stmt -- */
 int prs_stmt();
 /* -- decl -- */
@@ -144,6 +154,7 @@ int prs_decls();
 int prs_decl();
 int prs_decl_spec();
 
+/* sym */
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
 int sym_islabel(token_st*);
@@ -152,16 +163,31 @@ scope_st*   sym_mnp_scope(); /* make and push scope to context */
 void   sym_push_scope(scope_st*);
 void   sym_pop_scope();
 var_st*     sym_make_var(char*, type_st*);
-var_st*     sym_make_temp_var(type_st*);
+var_st*     sym_find_var(char*);
+var_st*     sym_add_var(var_st*);
+var_st*     sym_make_temp_var(var_st*);
 var_st*     sym_make_imm(lex_token*);
 var_st*     sym_make_par(char*, type_st*);
 func_st*    sym_make_func(char*, type_st*);
+func_st*    sym_find_func(char*);
 void        sym_add_type(type_st*);
+type_st*    pointer_of(type_st*);
 
+/* gen */
+void gen_emit0(ir_op_en);
+void gen_emit1(ir_op_en, var_st*);
+void gen_emit2(ir_op_en, var_st*, var_st*);
+void gen_emit3(ir_op_en, var_st*, var_st*, var_st*);
+void gen_emit_call(ir_op_en, func_st*, list_st*);
+void gen_print_func_ir(func_st*);
+
+/* util */
 void fexit(const char *format, ...);
 char* dup_str(char*);
+value_un* dup_value(value_un*);
 list_st* make_list();
 void*    list_append(list_st*, void*);
+int     list_index(list_st*, void*);
 
 /*==-- Macros --==*/
 #define EMIT_M_MACRO(_0,_1,_2, _3, NAME, ...) NAME
