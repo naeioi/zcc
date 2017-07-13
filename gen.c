@@ -50,19 +50,21 @@ static char* name_var(var_st *);
 
 static void print_var(var_st *v) {
     if(v->value) {
-        if(v->type == type_int) printf("%d", v->value->i);
+        printf("const[");
+        if(v->type == type_int) printf("%d]", v->value->i);
         else {
             /* TODO */
         }
     }
     else {
-        printf("%s", name_var(v));
+        printf("var[%s %s]", v->type->name, name_var(v));
     }    
 }
 
-static char* name_var(var_st *v) {
+static char* name_var(var_st *var) {
     static char strs[256];
     char *name;
+    if(var->irname) return var->irname;
     if(var->name) name = var->name;
     else {
         int i = list_index(tvars, var);
@@ -74,7 +76,7 @@ static char* name_var(var_st *v) {
         sprintf(name, "V%d", i);
     }
     printf("var[%s %s]", var->type->name, var->name);
-    return name;
+    return var->irname = name;
 }
 
 void gen_print_func_ir(func_st* func) {
@@ -119,6 +121,9 @@ void gen_print_func_ir(func_st* func) {
         if(inst->op == IR_CALL) {
             printf("call\t");
             print_var(args[0]); print_args(args[1]);
+        }
+        if(inst->op == IR_RETURN) {
+            printf("return");
         }
         printf("\n");
     }

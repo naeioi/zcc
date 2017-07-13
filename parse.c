@@ -99,6 +99,7 @@ Note:
     
     This leads to incorrect expresstion like a + b = c gets accepted
     But we could leave error detection later to semantic stage
+    i.e. reject input once we find a+b is not lvalue.
 */
 var_st* prs_assign() {
     PRS_FUNC_BG
@@ -114,7 +115,6 @@ var_st* prs_assign() {
         /* TODO: support assignment other than = */
         lex_next();
         t = prs_assign();
-        /* TODO: check if r is a lvalue */
         assert(r->lvalue == 1);
         gen_emit(IR_ASSIGN, r, t);
     }
@@ -135,7 +135,7 @@ var_st* prs_cond() {
     var_st *r;
     
     r = prs_binary(prs_prec[TK_OP_ASSIGN]+1);
-    if(lex_valid() && lex_token.tk_str[0] == ':') {
+    if(lex_valid() && lex_token.tk_str[0] == '?') {
         PT_PRT_IND
         fprintf(stderr, "operator[?:]\n");
         
@@ -624,6 +624,8 @@ int prs_stmt_return() {
     }
     prs_expect_char(';'); lex_next();
     
+    gen_emit(IR_RETURN);
+    
     return 0;
 }
 
@@ -717,7 +719,6 @@ int prs_stmt() {
  * { declaration }
  */
 int prs_decls() {
-    /* TODO: forbid nested function declaration */
     PRS_FUNC_BG
     PT_FUNC
     
@@ -755,6 +756,9 @@ int prs_decl() {
     PT_FUNC 
      
     type_st *type_base = prs_decl_spec();
+    type_st *type = NULL;
+    var_st  *var  = NULL;
+    char vname[255];
     
     /* (possibly) Variable declaration
      * => init-declarator { , init-declarator } ; 
@@ -763,8 +767,8 @@ int prs_decl() {
      */
     
     while(1) {
-        var_st *type = type_base;
-        char vname[255];
+        var = NULL;
+        type = type_base;
         
         if(lex_token.tk_str[0] == '*') {
             PT_PRT_IND
@@ -776,9 +780,9 @@ int prs_decl() {
         else
             prs_expect_class(TK_IDENTIFIER); 
         
+        strcpy(vname, lex_token.tk_str);
         lex_next();
         
-        strcpy(vname, lex_token.tk_str);
         PT_PRT_IND
         fprintf(stderr, "%s[name='%s']\n", lex_token.tk_str[0] == '(' ? "func" : "var", vname);
         
@@ -816,6 +820,7 @@ int prs_decl() {
          func_st  *nfunc  = sym_make_func();
          
          if(lex_token.tk_str[0] != ')') {
+             /* parse parameters */
              while(1) {
                  char    *par_name;
                  type_st *par_type = prs_decl_spec();
@@ -848,6 +853,8 @@ int prs_decl() {
          prs_stmt();
          
          sym_pop_scope();
+         
+         list_append(context.funcs, nfunc);
     }
     else {
         prs_expect_char(';'); lex_next();

@@ -56,6 +56,23 @@ void test_decls(char *filename) {
     prs_decls();
 }
 
+void test_ir(char *filename) {
+    lex_load_file(filename);
+    lex_next();
+    
+    prs_init();
+    sym_init();
+    prs_decls();
+    
+    list_st *funcs = context.funcs;
+    int i = 0;
+    printf("Read %d functions.\n", funcs->len + 1);
+    for(; i < funcs->len; i++) {
+        printf("\n");
+        gen_print_func_ir(funcs->elems[i]);
+    }
+}
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -69,4 +86,6 @@ int main(int argc, char **argv)
         test_decl(argv[2]);
     if(argc == 3 && strcmp("-ds", argv[1]) == 0)
         test_decls(argv[2]);
+    if(argc == 3 && strcmp("-ir", argv[1]) == 0)
+        test_ir(argv[2]);
 }   

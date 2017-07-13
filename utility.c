@@ -37,8 +37,8 @@ void* list_append(list_st* list, void* elem) {
     if(list->len >= list->room) {
         list->room *= 2;
         realloc(list->elemes, list->room);
-        list->elems[list->len++] = elem;
     }
+    list->elems[list->len++] = elem;
     return NULL;
 }
 

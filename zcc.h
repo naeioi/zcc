@@ -36,6 +36,8 @@ typedef struct var_st {
     value_un *value;
     int      ispar; /* 0 if not parameter. otherwise parameter index. (i.e. ispar=1 for the first parameter) */
     int     lvalue;
+    
+    char *irname;
 } var_st;
 
 typedef struct scope_st {
@@ -59,7 +61,10 @@ typedef enum ir_op_en {
     IR_ADD,
     IR_SUB,
     IR_MUL,
-    IR_DIV
+    IR_DIV,
+    IR_RETURN,
+    IR_CALL,
+    IR_ASSIGN
 } ir_op_en;
 
 typedef struct inst_st {
@@ -120,6 +125,7 @@ typedef struct token_st {
 extern token_st   lex_token;
 extern context_st context; 
 extern type_st    *type_int;
+extern type_st    *type_int_ptr;
  
 /* =-- forward declaration --= */
 

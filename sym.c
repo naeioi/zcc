@@ -7,11 +7,12 @@ context_st context;
 /* =---- Symbol manager ----= */
 
 type_st* type_int;
+type_st* type_int_ptr;
 
 int sym_init() {
      
      /* initialize context */
-     context.func  = NULL;
+     context.func  = sym_make_func("(top)", NULL); /* virtual wrap function */
      context.scope = sym_make_scope();
      context.types = make_list();
      context.funcs = make_list()
@@ -19,12 +20,14 @@ int sym_init() {
      /* add native types */
      type_int = malloc(sizeof(int));
      type_int->bytes = sizeof(int);
+     type_int->native = 1;
      type_int->ref = NULL;
      type_int->name = "int";
      sym_add_type(type_int);
      
-     type_st *type_int_ptr = malloc(sizeof(int*));
+     type_int_ptr = malloc(sizeof(int*));
      type_int_ptr->bytes = sizeof(int*);
+     type_int_ptr->native = 1;
      type_int_ptr->ref = type_int;
      type_int_ptr->name = NULL;
      sym_add_type(type_int_ptr);
@@ -65,6 +68,7 @@ var_st* sym_make_var(char* name, type_st* type) {
     var->value = NULL;
     var->ispar = 0;
     var->lvalue = 1;
+    var->irname = NULL;
     sym_add_var(var);
     return var;
 }
@@ -108,6 +112,7 @@ var_st* sym_make_temp_var(type_st *type) {
     var->value = NULL;
     var->ispar = 0;
     var->lvalue = 0;
+    var->irname = NULL;
     /* dont add to scope */
     return var;
 }
@@ -119,6 +124,7 @@ var_st* sym_make_imm(lex_token* tk) {
     var->name = NULL;
     var->value = dup_value(tk->value);
     var->ispar = 0;
+    var->irname = NULL;
     return var;
 }
 
@@ -131,6 +137,8 @@ var_st* sym_make_par(char* name, type_st* type) {
     var->type = type;
     var->value = NULL;
     var->ispar = pars->len + 1;
+    var->lvalue = 1;
+    var->irname = NULL;
     list_append(pars, var);
     sym_add_var(var);
     return var;
@@ -144,6 +152,7 @@ func_st* sym_make_func(char* name, type_st* rtype) {
     func->pars  = make_list();
     func->insts = male_list();
     func->ret   = NULL;
+    assert(strcmp(context.func->name, "(top)") == 0); /* dont allow nested function */
     context.func = func;
     return func;
 }
