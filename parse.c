@@ -507,19 +507,31 @@ int prs_stmt_if() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
 
+    var_st *cond;
+    label_st *ifT = sym_make_label(), *ifF = sym_make_label(), *ifE = sym_make_label();
+    
     lex_next();
     prs_expect_char('('); lex_next();
-    prs_expr();
+    cond = prs_expr();
     prs_expect_char(')'); lex_next();
-
+    
+    gen_emit(IR_CJMP, cond, ifT);
+    gen_emit(IR_JMP, ifF);
+    
+    gen_emit(IR_LABEL, ifT);
     prs_stmt();
+    gen_emit(IR_JMP, ifE);
     if(lex_valid() && lex_token.tk_class == TK_ELSE) {
         PT_PRT_IND
         fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
-
         lex_next();
+        
+        ifF = sym_make_label();
+        gen_emit(IR_LABEL, ifF);
         prs_stmt();
     }
+    
+    gen_emit(IR_LABEL, ifE);
     
     return 0;
 }

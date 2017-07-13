@@ -47,7 +47,8 @@ typedef struct scope_st {
 
 typedef struct label_st {
     struct func_st *func;
-    int ind;
+    struct label_st *chain; /* shared label. */
+    char *irname;
 } label_st;
 
 typedef struct context_st {
@@ -55,6 +56,13 @@ typedef struct context_st {
     struct func_st  *func;
     struct list_st  *funcs; /* list of func_st* */
     struct list_st  *types; /* list of type_st*. in C, types are global */
+    struct label_st *ifT;
+    struct label_st *ifF;
+    struct label_st *ifE;
+    struct label_st *whileB;
+    struct label_st *whileE;
+    struct label_st *forB;
+    struct label_st *forE;
 } context_st;
 
 typedef enum ir_op_en {
@@ -64,7 +72,10 @@ typedef enum ir_op_en {
     IR_DIV,
     IR_RETURN,
     IR_CALL,
-    IR_ASSIGN
+    IR_ASSIGN,
+    IR_LABEL,
+    IR_JMP,
+    IR_CJMP
 } ir_op_en;
 
 typedef struct inst_st {
@@ -188,6 +199,7 @@ var_st*     sym_make_par(char*, type_st*);
 func_st*    sym_make_func(char*, type_st*);
 func_st*    sym_find_func(char*);
 void        sym_add_type(type_st*);
+label_st*   sym_make_label();
 type_st*    pointer_of(type_st*);
 
 /* gen */

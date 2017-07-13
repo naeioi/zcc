@@ -22,6 +22,10 @@ int sym_init() {
      context.types = make_list();
      context.funcs = make_list();
      
+     context.ifT = context.ifF = context.ifE =
+     context.whileB = context.whileE = 
+     context.forB = context.forE = NULL;
+     
      /* add native types */
      type_int = malloc(sizeof(int));
      type_int->bytes = sizeof(int);
@@ -178,6 +182,14 @@ int sym_hastype(token_st *tk) {
 int sym_islabel(token_st* tk) {
     /* TODO */
     return 0;
+}
+
+label_st* sym_make_label() {
+    label_st *label = malloc(sizeof(label_st));
+    label->func     = context.func;
+    label->chain    = NULL;
+    label->irname   = NULL;
+    return label;
 }
 
 type_st* pointer_of(type_st* type) {

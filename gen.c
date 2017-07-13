@@ -48,6 +48,7 @@ void gen_emit_call(ir_op_en op, func_st* func, var_st *rvar, list_st *args) {
 }
 
 static list_st *tvars;
+static list_st *tlabels;
 static char* name_var(var_st *);
 
 static void print_var(var_st *v) {
@@ -83,7 +84,7 @@ static char* name_var(var_st *var) {
         sprintf(name, "V%d", i);
     }
     //printf("var[%s %s]", var->type->name, var->name);
-    return var->irname = name;
+    return var->irname = dup_str(name);
 }
 
 static void print_args(list_st *args) {
@@ -97,10 +98,24 @@ static void print_args(list_st *args) {
     printf(")");
 }
 
+static char* name_label(label_st *label_) {
+    static char str[256];
+    label_st *label = label_;
+    if(label->irname) return label->irname;
+    while(label->chain) label = label->chain;
+    if(label->irname == NULL) {
+        sprintf(str, "L%d", tlabels->len);
+        list_append(tlabels, label);
+        label->irname = dup_str(str);
+    }
+    return label_->irname = label->irname;
+}
+
 void gen_print_func_ir(func_st* func) {
     list_st *insts = func->insts;
     list_st *args  = func->pars;
-    tvars = make_list();
+    tvars   = make_list();
+    tlabels = make_list();
     int i;
     
     printf("Func[name=%s, rtype=%s, rvar=%s, args=["
@@ -146,6 +161,15 @@ void gen_print_func_ir(func_st* func) {
         }
         else if(inst->op == IR_RETURN) {
             printf("ret");
+        }
+        else if(inst->op == IR_LABEL) {
+            printf("label %s", name_label(args[0]));
+        }
+        else if(inst->op == IR_JMP) {
+            printf("jmp %s", name_label(args[0]));
+        }
+        else if(inst->op == IR_CJMP) {
+            printf("cjmp %s %s", name_var(args[0]), name_label(args[1]));
         }
         printf("\n");
     }
