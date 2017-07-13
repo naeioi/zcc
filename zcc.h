@@ -12,16 +12,16 @@ union value_un;
 typedef struct type_st {
     int bytes;
     int native;     /* is native type */
-    type_st* ref;   /* ref != NULL if its pointer */
+    struct type_st* ref;   /* ref != NULL if its pointer */
     char *name;     /* name == NULL for pointer */
 } type_st;
 
 typedef struct func_st {
     char    *name;
-    type_st *rtype;
-    list_st *pars; /* list of var_st */
-    list_st *insts;
-    var_st  *ret;
+    struct type_st *rtype;
+    struct list_st *pars; /* list of var_st */
+    struct list_st *insts;
+    struct var_st  *ret;
 } func_st;
 
 typedef struct list_st {
@@ -32,8 +32,8 @@ typedef struct list_st {
 
 typedef struct var_st {
     char     *name;
-    type_st  *type;
-    value_un *value;
+    struct type_st  *type;
+    union value_un *value;
     int      ispar; /* 0 if not parameter. otherwise parameter index. (i.e. ispar=1 for the first parameter) */
     int     lvalue;
     
@@ -42,19 +42,19 @@ typedef struct var_st {
 
 typedef struct scope_st {
     struct scope_st *up;
-    list_st *vars; /* list of var_st* */
+    struct list_st *vars; /* list of var_st* */
 } scope_st;
 
 typedef struct label_st {
-    func_st *func;
+    struct func_st *func;
     int ind;
-}
+} label_st;
 
 typedef struct context_st {
-    scope_st *scope;
-    func_st  *func;
-    list_st  *funcs; /* list of func_st* */
-    list_st  *types; /* list of type_st*. in C, types are global */
+    struct scope_st *scope;
+    struct func_st  *func;
+    struct list_st  *funcs; /* list of func_st* */
+    struct list_st  *types; /* list of type_st*. in C, types are global */
 } context_st;
 
 typedef enum ir_op_en {
@@ -150,15 +150,24 @@ var_st* prs_expr();
 var_st* prs_primary();
 list_st* prs_args();
 var_st* prs_unary();
-var_st* prs_pst(int);
+var_st* prs_pst(var_st*);
 var_st* prs_assign();
 var_st* prs_cond();
 /* -- stmt -- */
+int prs_stmt_return();
+int prs_stmt_if();
+int prs_stmt_else();
+int prs_stmt_for();
+int prs_stmt_while();
+int prs_stmt_dowhile();
+int prs_stmt_switch();
+int prs_stmt_break();
+int prs_stmt_continue();
 int prs_stmt();
 /* -- decl -- */
 int prs_decls();
 int prs_decl();
-int prs_decl_spec();
+type_st* prs_decl_spec();
 
 /* sym */
 int sym_hasid(token_st*);
@@ -171,8 +180,8 @@ void   sym_pop_scope();
 var_st*     sym_make_var(char*, type_st*);
 var_st*     sym_find_var(char*);
 var_st*     sym_add_var(var_st*);
-var_st*     sym_make_temp_var(var_st*);
-var_st*     sym_make_imm(lex_token*);
+var_st*     sym_make_temp_var(type_st*);
+var_st*     sym_make_imm(token_st*);
 var_st*     sym_make_par(char*, type_st*);
 func_st*    sym_make_func(char*, type_st*);
 func_st*    sym_find_func(char*);
@@ -184,7 +193,7 @@ void gen_emit0(ir_op_en);
 void gen_emit1(ir_op_en, var_st*);
 void gen_emit2(ir_op_en, var_st*, var_st*);
 void gen_emit3(ir_op_en, var_st*, var_st*, var_st*);
-void gen_emit_call(ir_op_en, func_st*, list_st*);
+void gen_emit_call(ir_op_en, func_st*, var_st*, list_st*);
 void gen_print_func_ir(func_st*);
 
 /* util */

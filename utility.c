@@ -18,9 +18,9 @@ char* dup_str(char* s) {
     return t;
 }
 
-value_st *dup_value(value_st *val) {
-    value_st *r = malloc(sizeof(value_st));
-    memcpy(r, val, sizeof(value_st));
+value_un *dup_value(value_un *val) {
+    value_un *r = malloc(sizeof(value_un));
+    memcpy(r, val, sizeof(value_un));
     return r;
 }
 
@@ -36,7 +36,7 @@ list_st* make_list() {
 void* list_append(list_st* list, void* elem) {
     if(list->len >= list->room) {
         list->room *= 2;
-        realloc(list->elemes, list->room);
+        realloc(list->elems, list->room);
     }
     list->elems[list->len++] = elem;
     return NULL;

@@ -1,8 +1,12 @@
 Func {
     char  *name;
-    List  *pars;
+    VarList  *pars;
     Type  *rtype;
     Block *entry;
+}
+
+Var {
+    enum VarType
 }
 
 BlockLabel {
@@ -73,3 +77,31 @@ continue
       | 
 { C } V
 LableO:
+
+===--------===
+
+int add(int a, int b) {
+    if(a + b <= 10) {
+        return a + b;
+    }
+    else {
+        return 0;
+    }
+}
+
+Func[name="add", rtype=int, pars=[Var[int], Var[int]]] {
+    add c a b
+    lt  d c 10
+    cjmp  d label1
+    jmp label3
+label1:
+    add e a b
+    mov _ret e
+    jmp label4
+label3:
+    mov _ret 0
+    jmp label4
+label2:
+label4:
+    ret
+}

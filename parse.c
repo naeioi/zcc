@@ -105,7 +105,7 @@ var_st* prs_assign() {
     PRS_FUNC_BG
     PT_FUNC
     
-    var_st* r, t;
+    var_st *r, *t;
     
     r = prs_cond();
     if(lex_valid() && lex_isassignop(&lex_token)) {
@@ -192,7 +192,8 @@ var_st* prs_binary(int k) {
             t = prs_binary(i+1);
             
             if(u == NULL) {
-                u = sym_make_temp_var();
+                /* TODO: variable lifting */
+                u = sym_make_temp_var(type_int);
                 gen_emit(ir_op, u, r, t);
             }
             else {
@@ -252,9 +253,9 @@ var_st* prs_unary() {
              * => primary-expression { postfix-operator }
              * => '(' expression ')' { postfix-operator }
              */
-             prs_expr();
+             var_st *var = prs_expr();
              prs_expect_char(')'); lex_next();
-             prs_pst(1);
+             prs_pst(var);
         }
     }
     else if(lex_isunaryop(&lex_token)) {
@@ -375,10 +376,10 @@ var_st* prs_primary() {
             printf("prs_primary[call=%s()]\n", lex_token.tk_str);
             lex_next();
             
-            list_st *pars = prs_pars();
+            list_st *pars = prs_args();
             func_st *func = sym_find_func(vname);
             r = sym_make_temp_var(func->rtype);
-            gen_emit_call(IR_CALL, r, pars);
+            gen_emit_call(IR_CALL, func, r, pars);
             
             prs_expect_char(')'); lex_next();
         }
@@ -429,7 +430,7 @@ list_st* prs_args() {
     }
     
     PRS_FUNC_ED
-    return pars;
+    return args;
 }
 
 /* =-- Statements --= */
@@ -681,7 +682,7 @@ int prs_stmt() {
     }
     else if(lex_token.tk_class == TK_RETURN) {
         /* => return  [ expression ] ; */
-        pts_stmt_return();
+        prs_stmt_return();
     }
     else if(lex_token.tk_str[0] == '{') {
         /* => '{' { declaration } { statement } '}' */
@@ -817,7 +818,7 @@ int prs_decl() {
          lex_next();
          
          scope_st *nscope = sym_mnp_scope();
-         func_st  *nfunc  = sym_make_func();
+         func_st  *nfunc  = sym_make_func(vname, type);
          
          if(lex_token.tk_str[0] != ')') {
              /* parse parameters */

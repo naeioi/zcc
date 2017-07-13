@@ -1,6 +1,8 @@
 /* sym.c */
 #include "zcc.h"
 #include <memory.h>
+#include <stdlib.h>
+#include <assert.h>
 
 context_st context;
 
@@ -15,7 +17,7 @@ int sym_init() {
      context.func  = sym_make_func("(top)", NULL); /* virtual wrap function */
      context.scope = sym_make_scope();
      context.types = make_list();
-     context.funcs = make_list()
+     context.funcs = make_list();
      
      /* add native types */
      type_int = malloc(sizeof(int));
@@ -43,6 +45,7 @@ scope_st* sym_make_scope() {
     scope_st *scope = malloc(sizeof(scope_st));
     scope->up = NULL;
     scope->vars = make_list();
+    return scope;
 }
 
 void sym_push_scope(scope_st *scope) {
@@ -78,6 +81,7 @@ var_st* sym_add_var(var_st *var) {
     scope_st *scope = context.scope;
     list_st  *vars  = scope->vars;
     list_append(vars, var);
+    return var;
 }
 
 var_st* sym_find_var(char *name) {
@@ -88,7 +92,7 @@ var_st* sym_find_var(char *name) {
         vars = scope->vars;
         assert(vars);
         for(i = 0; i < vars->len; i++) {
-            if(strcmp(name, (var_st*)(vars->elems[i])->name) == 0)
+            if(strcmp(name, ((var_st*)vars->elems[i])->name) == 0)
                 return vars->elems[i];
         }
         scope = scope->up;
@@ -100,7 +104,7 @@ func_st* sym_find_func(char *name) {
     list_st *funcs = context.funcs;
     int i;
     for(i = 0; i < funcs->len; i++)
-        if(strcmp(name, (func_st*)(funcs->elems[i])->name) == 0)
+        if(strcmp(name, ((func_st*)funcs->elems[i])->name) == 0)
             return funcs->elems[i];
     return NULL;
 }
@@ -117,7 +121,7 @@ var_st* sym_make_temp_var(type_st *type) {
     return var;
 }
 
-var_st* sym_make_imm(lex_token* tk) {
+var_st* sym_make_imm(token_st* tk) {
     var_st *var = malloc(sizeof(var_st));
     /* support only int for now */
     var->type = tk->tk_class == TK_CONST_INT ? type_int : NULL;
@@ -150,7 +154,7 @@ func_st* sym_make_func(char* name, type_st* rtype) {
     func->name = dup_str(name);
     func->rtype = rtype;
     func->pars  = make_list();
-    func->insts = male_list();
+    func->insts = make_list();
     func->ret   = NULL;
     assert(strcmp(context.func->name, "(top)") == 0); /* dont allow nested function */
     context.func = func;
@@ -177,12 +181,12 @@ type_st* pointer_of(type_st* type) {
     list_st *types = context.types;
     int i = 0;
     for(; i < types->len; i++) {
-        if(types->elems[i]->ref == types)
+        if(((type_st*)types->elems[i])->ref == type)
             return types->elems[i];
     }
     /* pointer type not found. create one */
     type_st *ntype = malloc(sizeof(type_st));
-    ntype->size = sizeof(void*);
+    ntype->bytes = sizeof(void*);
     ntype->native = 0;
     ntype->ref = type;
     ntype->name = NULL;
