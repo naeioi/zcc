@@ -356,13 +356,14 @@ function-call:
 var_st* prs_primary() {
     PRS_FUNC_BG
     
+    static char vname[256];
     var_st* r = NULL;
     
     if(lex_token.tk_class == TK_IDENTIFIER) {
         PT_PRT_IND
         printf("prs_primary[IDENTIFIER=%s]\n", lex_token.tk_str);
         
-        char *vname = dup_str(lex_token.tk_str);
+        strcpy(vname, lex_token.tk_str);
         lex_next();
         
         if(lex_token.tk_str[0] != '(') {

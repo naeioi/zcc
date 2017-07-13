@@ -145,6 +145,7 @@ void gen_print_func_ir(func_st* func) {
         void **args = inst->args;
         printf("    ");
         
+        //fprintf(stderr, "inst=%x\n", inst);
         if(inst->op == IR_ASSIGN) {
             printf("mov\t");
             print_var_t(args[0]); print_var_t(args[1]); 

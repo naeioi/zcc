@@ -36,7 +36,7 @@ list_st* make_list() {
 void* list_append(list_st* list, void* elem) {
     if(list->len >= list->room) {
         list->room *= 2;
-        realloc(list->elems, list->room);
+        list->elems = realloc(list->elems, list->room * sizeof(void*));
     }
     list->elems[list->len++] = elem;
     return NULL;
