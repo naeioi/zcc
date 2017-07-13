@@ -572,13 +572,28 @@ int prs_stmt_while() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
     
+    var_st *cond;
+    label_st *forC = sym_make_label(), *forB = sym_make_label(), *forE = sym_make_label();
+    context.scope->forB = forB; 
+    context.scope->forE = forE; 
+    context.scope->forC = forC;
+    var_st *cond;
+    
+    gen_emit(IR_LABEL, forC);
     lex_next();
     prs_expect_char('('); lex_next();
-    prs_expr();
+    cond = prs_expr();
     prs_expect_char(')'); lex_next();
     
+    gen_emit(IR_CJMP, cond, forB);
+    gen_emit(IR_JMP, forE);
+    gen_emit(IR_LABEL, forB);
     prs_stmt();
+    gen_emit(IR_LABEL, forE);
     
+    context.scope->forC = 
+    context.scope->forB = 
+    context.scope->forE = NULL;
     return 0;
 }
 
@@ -586,14 +601,24 @@ int prs_stmt_dowhile() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
 
+    label_st *forB = sym_make_label(), *forE = sym_make_label();
+    context.scope->forB = forB; 
+    context.scope->forE = forE; 
+    var_st *cond;
+    
+    gen_emit(IR_LABEL, forB);
     lex_next();
     prs_stmt();
     prs_expect_class(TK_WHILE); lex_next();
     prs_expect_char('('); lex_next();
-    prs_expr();
+    cond = prs_expr();
+    gen_emit(IR_CJMP, cond, forB);
     prs_expect_char(')'); lex_next();
     prs_expect_char(';'); lex_next();
+    gen_emit(IR_LABEL, forE);
     
+    context.scope->forB = 
+    context.scope->forE = NULL;
     return 0;
 }
 
@@ -602,7 +627,9 @@ int prs_stmt_for() {
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
     
     label_st *forB = sym_make_label(), *forC = sym_make_label(), *forE = sym_make_label();
-    context.forB = forB; context.forE = forE; context.forC = forC;
+    context.scope->forB = forB; 
+    context.scope->forE = forE; 
+    context.scope->forC = forC;
     var_st *cond;
     
     lex_next();
@@ -629,7 +656,9 @@ int prs_stmt_for() {
     gen_emit(IR_JMP, forC);
     gen_emit(IR_LABEL, forE);
     
-    context.forB = context.forE = NULL;
+    context.scope->forC = 
+    context.scope->forB = 
+    context.scope->forE = NULL;
     return 0;
 }
 
@@ -639,6 +668,9 @@ int prs_stmt_break() {
     
     lex_next();
     prs_expect_char(';'); lex_next();
+    
+    assert(context.scope->forE);
+    gen_emit(IR_JMP, context.scope->forE);
     
     return 0;
 }
@@ -650,6 +682,8 @@ int prs_stmt_continue() {
     lex_next();
     prs_expect_char(';'); lex_next();
     
+    assert(context.scope->forC);
+    gen_emit(IR_JMP, context.scope->forC);
     return 0;
 }
 
