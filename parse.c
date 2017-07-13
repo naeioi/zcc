@@ -526,10 +526,10 @@ int prs_stmt_if() {
         fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
         lex_next();
         
-        ifF = sym_make_label();
         gen_emit(IR_LABEL, ifF);
         prs_stmt();
     }
+    else ifF->chain = ifE;
     
     gen_emit(IR_LABEL, ifE);
     

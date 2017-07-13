@@ -204,9 +204,9 @@ type_st*    pointer_of(type_st*);
 
 /* gen */
 void gen_emit0(ir_op_en);
-void gen_emit1(ir_op_en, var_st*);
-void gen_emit2(ir_op_en, var_st*, var_st*);
-void gen_emit3(ir_op_en, var_st*, var_st*, var_st*);
+void gen_emit1(ir_op_en, void*);
+void gen_emit2(ir_op_en, void*, void*);
+void gen_emit3(ir_op_en, void*, void*, void*);
 void gen_emit_call(ir_op_en, func_st*, var_st*, list_st*);
 void gen_print_func_ir(func_st*);
 

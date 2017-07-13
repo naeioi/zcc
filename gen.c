@@ -23,19 +23,19 @@ void gen_emit0(ir_op_en op) {
     emit(make_inst(op));
 }
 
-void gen_emit1(ir_op_en op, var_st* var) {
+void gen_emit1(ir_op_en op, void* var) {
     inst_st *inst = make_inst(op);
     inst->args[0] = var;
     emit(inst);
 }
 
-void gen_emit2(ir_op_en op, var_st* arg0, var_st* arg1) {
+void gen_emit2(ir_op_en op, void* arg0, void* arg1) {
     inst_st *inst = make_inst(op);
     inst->args[0] = arg0; inst->args[1] = arg1;
     emit(inst);
 }
 
-void gen_emit3(ir_op_en op, var_st* arg0, var_st* arg1, var_st* arg2) {
+void gen_emit3(ir_op_en op, void* arg0, void* arg1, void* arg2) {
     inst_st *inst = make_inst(op);
     inst->args[0] = arg0; inst->args[1] = arg1; inst->args[2] = arg2;
     emit(inst);
