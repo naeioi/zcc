@@ -12,6 +12,7 @@ context_st context;
 type_st* type_int;
 type_st* type_int_ptr;
 func_st* wrap_func;
+static list_st *disposed_temp_vars;
 
 int sym_init() {
      
@@ -36,6 +37,8 @@ int sym_init() {
      type_int_ptr->ref = type_int;
      type_int_ptr->name = NULL;
      sym_add_type(type_int_ptr);
+     
+     disposed_temp_vars = NULL;
      
      return 0;
 }
@@ -78,16 +81,24 @@ var_st* sym_make_var(char* name, type_st* type) {
     var->value = NULL;
     var->ispar = 0;
     var->lvalue = 1;
+    
     var->irname = NULL;
+    var->addr   = 0;
     sym_add_var(var);
     return var;
 }
 
 /* add to scope */
 var_st* sym_add_var(var_st *var) {
+    func_st *func   = context.func;
     scope_st *scope = context.scope;
     list_st  *vars  = scope->vars;
     list_append(vars, var);
+    /* reserve space for local variable */
+    if(func != wrap_func) {
+        var->addr = func->rbytes;
+        func->rbytes += 8; /* max size for var is 8 bytes */
+    }
     return var;
 }
 
@@ -117,25 +128,45 @@ func_st* sym_find_func(char *name) {
 }
 
 var_st* sym_make_temp_var(type_st *type) {
-    var_st *var = malloc(sizeof(var_st));
+    var_st *var;
+    func_st *func = context.func;
+    assert(func != wrap_func);
+    
+    if(!list_isempty(disposed_temp_vars)) {
+        var = list_pop(disposed_temp_vars);
+    }
+    else {
+        var = malloc(sizeof(var_st));
+        var->irname = NULL;
+        var->addr = func->rbytes;
+        func->rbytes += 8; /* always align to 8 bytes */
+        /* dont add to scope */
+    }
     var->name = NULL;
     var->type = type;
     var->value = NULL;
     var->ispar = 0;
     var->lvalue = 0;
-    var->irname = NULL;
-    /* dont add to scope */
     return var;
+}
+
+void sym_dispose_temp_var(var_st *var) {
+    if(var->lvalue == 0 && var->value == NULL) {
+        var->value = NULL;
+        list_append(disposed_temp_vars, var);
+    }
 }
 
 var_st* sym_make_imm(token_st* tk) {
     var_st *var = malloc(sizeof(var_st));
+    var->irname = NULL;
+    var->addr = -1;
     /* support only int for now */
     var->type = tk->tk_class == TK_CONST_INT ? type_int : NULL;
     var->name = NULL;
     var->value = dup_value(tk->value);
     var->ispar = 0;
-    var->irname = NULL;
+    var->lvalue = 0;
     return var;
 }
 
@@ -163,8 +194,12 @@ func_st* sym_make_func(char* name, type_st* rtype) {
     func->pars  = make_list();
     func->insts = make_list();
     func->ret   = NULL;
+    func->rbytes = 0;
     assert(context.func == NULL || strcmp(context.func->name, "(top)") == 0); /* dont allow nested function */
     context.func = func;
+    
+    if(disposed_temp_vars) free(disposed_temp_vars);
+    disposed_temp_vars = make_list();
     return func;
 }
 

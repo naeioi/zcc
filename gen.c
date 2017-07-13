@@ -52,6 +52,7 @@ static list_st *tlabels;
 static char* name_var(var_st *);
 
 static void print_var(var_st *v) {
+    //printf("[addr=%x]", v);
     if(v->value) {
         printf("const[");
         if(v->type == type_int) printf("%d]", v->value->i);

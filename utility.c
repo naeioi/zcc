@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 void fexit(const char *format, ...) {
     puts(format);
@@ -40,6 +41,15 @@ void* list_append(list_st* list, void* elem) {
     }
     list->elems[list->len++] = elem;
     return NULL;
+}
+
+void* list_pop(list_st* list) {
+    assert(list->len > 0);
+    return list->elems[--list->len];
+}
+
+int list_isempty(list_st* list) {
+    return list->len == 0;
 }
 
 int list_index(list_st* list, void* elem) {

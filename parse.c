@@ -10,7 +10,7 @@
 /* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
 
 int _prs_depth = -1;
-#define PRT_LEAVING
+//#define PRT_LEAVING
 #define PRS_FUNC_BG _prs_depth++;
 #ifdef PRT_LEAVING
 #define PRS_FUNC_ED \
@@ -125,6 +125,7 @@ var_st* prs_assign() {
         t = prs_assign();
         assert(r->lvalue == 1);
         gen_emit(IR_ASSIGN, r, t);
+        sym_dispose_temp_var(t);
     }
     
     PRS_FUNC_ED
@@ -419,6 +420,7 @@ var_st* prs_primary() {
         PT_PRT_IND
         printf("prs_primary[CONST=%s]\n", lex_token.tk_str);
         r = sym_make_imm(&lex_token);
+        //fprintf(stderr, "const[addr=%x, value=%d]", r, r->value->i);
         lex_next();
         //fprintf(stderr, "!--sym_make_imm(&lex_token)\n");
     }
@@ -544,7 +546,7 @@ int prs_stmt_if() {
     
     gen_emit(IR_CJMP, cond, ifT);
     gen_emit(IR_JMP, ifF);
-    
+    sym_dispose_temp_var(cond);
     gen_emit(IR_LABEL, ifT);
     prs_stmt();
     gen_emit(IR_JMP, ifE);
@@ -596,6 +598,7 @@ int prs_stmt_while() {
     prs_expect_char(')'); lex_next();
     
     gen_emit(IR_CJMP, cond, forB);
+    sym_dispose_temp_var(cond);
     gen_emit(IR_JMP, forE);
     gen_emit(IR_LABEL, forB);
     prs_stmt();
@@ -623,6 +626,7 @@ int prs_stmt_dowhile() {
     prs_expect_char('('); lex_next();
     cond = prs_expr();
     gen_emit(IR_CJMP, cond, forB);
+    sym_dispose_temp_var(cond);
     prs_expect_char(')'); lex_next();
     prs_expect_char(';'); lex_next();
     gen_emit(IR_LABEL, forE);
@@ -663,7 +667,7 @@ int prs_stmt_for() {
         gen_emit(IR_JMP, forC);
     }
     prs_expect_char(')'); lex_next();
-    
+    sym_dispose_temp_var(cond);
     gen_emit(IR_LABEL, forB);
     prs_stmt();
     gen_emit(IR_JMP, forI);

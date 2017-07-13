@@ -1,5 +1,5 @@
 /* zcc.h */
-
+#include <stdio.h>
 /* -- Runtime managerment -- */
 
 struct list_st;
@@ -22,6 +22,8 @@ typedef struct func_st {
     struct list_st *pars; /* list of var_st */
     struct list_st *insts;
     struct var_st  *ret;
+    /* for gen */
+    int rbytes; /* bytes should reserved for local variables */
 } func_st;
 
 typedef struct list_st {
@@ -37,7 +39,9 @@ typedef struct var_st {
     int      ispar; /* 0 if not parameter. otherwise parameter index. (i.e. ispar=1 for the first parameter) */
     int     lvalue;
     
+    /* for ir & gen */
     char *irname;
+    int addr; /* start address in stack frame. */
 } var_st;
 
 typedef struct scope_st {
@@ -198,6 +202,7 @@ var_st*     sym_make_var(char*, type_st*);
 var_st*     sym_find_var(char*);
 var_st*     sym_add_var(var_st*);
 var_st*     sym_make_temp_var(type_st*);
+void        sym_dispose_temp_var(var_st*);
 var_st*     sym_make_imm(token_st*);
 var_st*     sym_make_par(char*, type_st*);
 func_st*    sym_make_func(char*, type_st*);
@@ -214,12 +219,17 @@ void gen_emit3(ir_op_en, void*, void*, void*);
 void gen_emit_call(ir_op_en, func_st*, var_st*, list_st*);
 void gen_print_func_ir(func_st*);
 
+/* target-specific gen */
+void gen_assembly(FILE*);
+
 /* util */
 void fexit(const char *format, ...);
 char* dup_str(char*);
 value_un* dup_value(value_un*);
 list_st* make_list();
-void*    list_append(list_st*, void*);
+void*   list_append(list_st*, void*);
+void*   list_pop(list_st*);
+int     list_isempty(list_st*);
 int     list_index(list_st*, void*);
 
 /*==-- Macros --==*/

@@ -75,6 +75,22 @@ void test_ir(char *filename) {
     }
 }
 
+void test_asm(char *filename) {
+    lex_load_file(filename);
+    lex_next();
+    
+    prs_init();
+    sym_init();
+    prs_decls();
+    
+    fprintf(stderr, "Parse done.\n");
+    
+    list_st *funcs = context.funcs;
+    fprintf(stderr, "Read %d funcs.\n", funcs->len);
+    
+    gen_assembly(stdout);
+}
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -90,4 +106,6 @@ int main(int argc, char **argv)
         test_decls(argv[2]);
     if(argc == 3 && strcmp("-ir", argv[1]) == 0)
         test_ir(argv[2]);
+    if(argc == 3 && strcmp("-a" , argv[1]) == 0)
+        test_asm(argv[2]);
 }   

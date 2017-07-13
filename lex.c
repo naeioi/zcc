@@ -46,7 +46,7 @@ int lex_isunaryop(token_st *tk) {
         tk->tk_class == TK_OP_BAND  || 
         tk->tk_class == TK_OP_MUL   ||
         tk->tk_class == TK_OP_ADD   ||
-        tk->tk_class == TK_OP_DEL   ||
+        tk->tk_class == TK_OP_SUB   ||
         tk->tk_class == TK_OP_LNOT;
 }
 
