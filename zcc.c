@@ -64,9 +64,11 @@ void test_ir(char *filename) {
     sym_init();
     prs_decls();
     
+    fprintf(stderr, "Parse done.\n");
+    
     list_st *funcs = context.funcs;
     int i = 0;
-    printf("Read %d functions.\n", funcs->len + 1);
+    fprintf(stderr, "Read %d funcs.\n", funcs->len);
     for(; i < funcs->len; i++) {
         printf("\n");
         gen_print_func_ir(funcs->elems[i]);

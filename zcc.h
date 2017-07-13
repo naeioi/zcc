@@ -126,6 +126,7 @@ extern token_st   lex_token;
 extern context_st context; 
 extern type_st    *type_int;
 extern type_st    *type_int_ptr;
+extern func_st    *wrap_func; 
  
 /* =-- forward declaration --= */
 
@@ -170,6 +171,7 @@ int prs_decl();
 type_st* prs_decl_spec();
 
 /* sym */
+int sym_init();
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
 int sym_islabel(token_st*);

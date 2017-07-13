@@ -59,9 +59,13 @@ static void print_var(var_st *v) {
         }
     }
     else {
-        printf("var[%s %s]", v->type->name, name_var(v));
+        printf("%s[%s]", v->type->name, name_var(v));
     }    
-    printf("\t");
+    //printf("\t");
+}
+
+static void print_var_t(var_st *v) {
+    print_var(v); printf("\t");
 }
 
 static char* name_var(var_st *var) {
@@ -78,15 +82,19 @@ static char* name_var(var_st *var) {
         name = strs;
         sprintf(name, "V%d", i);
     }
-    printf("var[%s %s]", var->type->name, var->name);
+    //printf("var[%s %s]", var->type->name, var->name);
     return var->irname = name;
 }
 
 static void print_args(list_st *args) {
     int i;
+    //fprintf(stderr, "args[len=%d, addr=%x]\n", args->len, args);
+    printf("(");
     for(i = 0; i < args->len; i++) {
+        if(i > 0) printf(", ");
         print_var(args->elems[i]);
     }
+    printf(")");
 }
 
 void gen_print_func_ir(func_st* func) {
@@ -95,9 +103,11 @@ void gen_print_func_ir(func_st* func) {
     tvars = make_list();
     int i;
     
-    printf("Func[name=%s, rtype=%s, args=["
+    printf("Func[name=%s, rtype=%s, rvar=%s, args=["
         , func->name
-        , func->rtype ? "void" : func->rtype->name);
+        , func->rtype ? func->rtype->name : "void"
+        , name_var(func->ret));
+    
     for(i = 0; i < args->len; i++) {
         var_st *var = args->elems[i];
         if(i > 0) printf(", ");
@@ -110,10 +120,10 @@ void gen_print_func_ir(func_st* func) {
             }
         }
         else {            
-            printf("var[%s %s]", var->type->name, name_var(var));
+            print_var(var);
         }
     }
-    printf("]");
+    printf("]]\n");
     
     for(i = 0; i < insts->len; i++) {
         inst_st *inst = insts->elems[i];
@@ -122,17 +132,17 @@ void gen_print_func_ir(func_st* func) {
         
         if(inst->op == IR_ASSIGN) {
             printf("mov\t");
-            print_var(args[0]); print_var(args[1]); 
+            print_var_t(args[0]); print_var_t(args[1]); 
         }
         else if(inst->op == IR_ADD) {
             printf("add\t");
-            print_var(args[0]); print_var(args[1]); print_var(args[2]); 
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
         }
         else if(inst->op == IR_CALL) {
             printf("mov\t");
-            print_var(args[1]); 
-            printf("call %s\t", ((func_st*)args[0])->name); 
-            print_args(args[1]);
+            print_var_t(args[1]); 
+            printf("call %s", ((func_st*)args[0])->name); 
+            print_args(args[2]);
         }
         else if(inst->op == IR_RETURN) {
             printf("ret");

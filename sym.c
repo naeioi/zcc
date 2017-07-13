@@ -2,6 +2,7 @@
 #include "zcc.h"
 #include <memory.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 
 context_st context;
@@ -10,11 +11,13 @@ context_st context;
 
 type_st* type_int;
 type_st* type_int_ptr;
+func_st* wrap_func;
 
 int sym_init() {
      
      /* initialize context */
-     context.func  = sym_make_func("(top)", NULL); /* virtual wrap function */
+     context.func  = NULL;
+     context.func  = wrap_func = sym_make_func("(top)", NULL); /* virtual wrap function */
      context.scope = sym_make_scope();
      context.types = make_list();
      context.funcs = make_list();
@@ -156,7 +159,7 @@ func_st* sym_make_func(char* name, type_st* rtype) {
     func->pars  = make_list();
     func->insts = make_list();
     func->ret   = NULL;
-    assert(strcmp(context.func->name, "(top)") == 0); /* dont allow nested function */
+    assert(context.func == NULL || strcmp(context.func->name, "(top)") == 0); /* dont allow nested function */
     context.func = func;
     return func;
 }

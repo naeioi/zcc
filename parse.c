@@ -367,14 +367,18 @@ var_st* prs_primary() {
         
         if(lex_token.tk_str[0] != '(') {
             /* => identifer */
-            r = sym_find_var(lex_token.tk_str);
-            assert(r);
+            r = sym_find_var(vname);
+            //assert(r);
+            if(!r) {
+                fprintf(stderr, "var[name=%s] not found\n", vname);
+                fexit("");
+            }
         }
         else {
             /* => function-call */
+            lex_next();
             PT_PRT_IND
             printf("prs_primary[call=%s()]\n", lex_token.tk_str);
-            lex_next();
             
             list_st *pars = prs_args();
             func_st *func = sym_find_func(vname);
@@ -387,8 +391,9 @@ var_st* prs_primary() {
     else if(lex_token.tk_class == TK_CONST_INT) {
         PT_PRT_IND
         printf("prs_primary[CONST=%s]\n", lex_token.tk_str);
-        lex_next();
         r = sym_make_imm(&lex_token);
+        lex_next();
+        //fprintf(stderr, "!--sym_make_imm(&lex_token)\n");
     }
     else if(lex_token.tk_class == TK_CONST_STRING) {
         PT_PRT_IND
@@ -418,13 +423,15 @@ argument-list:
 */
 list_st* prs_args() {
     PRS_FUNC_BG
+    PT_FUNC
+    
     list_st *args = make_list();
     
     int i = 0;
     while(1) {
         i++;
         list_append(args, prs_assign());
-        if(lex_token.tk_str[0] == ',');
+        if(lex_token.tk_str[0] == ',') lex_next();
         else if(lex_token.tk_str[0] == ')') break;
         else fexit("Unexpected token");
     }
@@ -854,8 +861,9 @@ int prs_decl() {
          prs_stmt();
          
          sym_pop_scope();
-         
          list_append(context.funcs, nfunc);
+         context.func = wrap_func;
+         
     }
     else {
         prs_expect_char(';'); lex_next();
