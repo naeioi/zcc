@@ -584,6 +584,10 @@ int prs_stmt_for() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
     
+    label_st *forB = sym_make_label(), *forC = sym_make_label(), *forE = sym_make_label();
+    context.forB = forB; context.forE = forE; context.forC = forC;
+    var_st *cond;
+    
     lex_next();
     prs_expect_char('('); lex_next();
     if(lex_token.tk_str[0] != ';') {
@@ -591,16 +595,24 @@ int prs_stmt_for() {
     }
     prs_expect_char(';'); lex_next();
     if(lex_token.tk_str[0] != ';') {
-        prs_expr();
+        gen_emit(IR_LABEL, forC);
+        cond = prs_expr();
+        gen_emit(IR_CJMP, cond, forE);
     }
+    gen_emit(IR_JMP, forB);
     prs_expect_char(';'); lex_next();
     if(lex_token.tk_str[0] != ')') {
         prs_expr();
+        gen_emit(IR_JMP, forC);
     }
     prs_expect_char(')'); lex_next();
     
+    gen_emit(IR_LABEL, forB);
     prs_stmt();
+    gen_emit(IR_JMP, forC);
+    gen_emit(IR_LABEL, forE);
     
+    context.forB = context.forE = NULL;
     return 0;
 }
 

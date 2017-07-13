@@ -56,12 +56,15 @@ typedef struct context_st {
     struct func_st  *func;
     struct list_st  *funcs; /* list of func_st* */
     struct list_st  *types; /* list of type_st*. in C, types are global */
+    /*
     struct label_st *ifT;
     struct label_st *ifF;
     struct label_st *ifE;
+    */
     struct label_st *whileB;
     struct label_st *whileE;
-    struct label_st *forB;
+    struct label_st *forC; /* condition */
+    struct label_st *forB; /* body */
     struct label_st *forE;
 } context_st;
 
