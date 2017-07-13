@@ -186,6 +186,15 @@ var_st* prs_binary(int k) {
             tk_op = lex_token.tk_class;
             /* TODO: add support to other operators */
             if(tk_op == TK_OP_ADD) ir_op = IR_ADD;
+            else if(tk_op == TK_OP_LT) ir_op = IR_LT;
+            else if(tk_op == TK_OP_LE) ir_op = IR_LE;
+            else if(tk_op == TK_OP_EQ) ir_op = IR_EQ;
+            else if(tk_op == TK_OP_GT) ir_op = IR_GT;
+            else if(tk_op == TK_OP_GE) ir_op = IR_GE;
+            else if(tk_op == TK_OP_NEQ) ir_op = IR_NEQ;
+            else if(tk_op == TK_OP_SUB) ir_op = IR_SUB;
+            else if(tk_op == TK_OP_MUL) ir_op = IR_MUL;
+            else if(tk_op == TK_OP_DIV) ir_op = IR_DIV;
             else fexit("Not supported operator %s", lex_token.tk_str);
             
             lex_next();
@@ -292,7 +301,7 @@ var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) 
     PRS_FUNC_BG
     PT_FUNC
     
-    var_st *r = NULL;
+    var_st *r = NULL, *t;
     
     if(!passed_primary)
         r = prs_primary();
@@ -324,14 +333,22 @@ var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) 
         else if(lex_token.tk_class == TK_OP_INC) {
             PT_PRT_IND
             fprintf(stderr, "operator[T++]\n");
-            
             lex_next();
+            
+            t = sym_make_temp_var(r->type);
+            gen_emit(IR_ASSIGN, t, r);
+            gen_emit(IR_INC, r);
+            r = t;
         }
         else if(lex_token.tk_class == TK_OP_DEC) {
             PT_PRT_IND
             fprintf(stderr, "operator[T--]\n");
-            
             lex_next();
+            
+            t = sym_make_temp_var(r->type);
+            gen_emit(IR_ASSIGN, t, r);
+            gen_emit(IR_DEC, r);
+            r = t;
         }
         else break;
     }
@@ -597,9 +614,9 @@ int prs_stmt_for() {
     if(lex_token.tk_str[0] != ';') {
         gen_emit(IR_LABEL, forC);
         cond = prs_expr();
-        gen_emit(IR_CJMP, cond, forE);
+        gen_emit(IR_CJMP, cond, forB);
+        gen_emit(IR_JMP, forE);
     }
-    gen_emit(IR_JMP, forB);
     prs_expect_char(';'); lex_next();
     if(lex_token.tk_str[0] != ')') {
         prs_expr();

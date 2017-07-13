@@ -78,7 +78,15 @@ typedef enum ir_op_en {
     IR_ASSIGN,
     IR_LABEL,
     IR_JMP,
-    IR_CJMP
+    IR_CJMP,
+    IR_LT,
+    IR_LE,
+    IR_EQ,
+    IR_GT,
+    IR_GE,
+    IR_NEQ,
+    IR_INC,
+    IR_DEC
 } ir_op_en;
 
 typedef struct inst_st {

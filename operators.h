@@ -16,7 +16,7 @@ yy(TK_OP_LE,        "<=",	ASSO_L,     10)
 yy(TK_OP_GE,        ">=",	ASSO_L,     10)
 /* single char operators */
 xx(TK_OP_ADD,       '+',	ASSO_L,     12)
-xx(TK_OP_DEL,       '-',	ASSO_L,     12)
+xx(TK_OP_SUB,       '-',	ASSO_L,     12)
 xx(TK_OP_MUL,       '*',	ASSO_L,     13)
 xx(TK_OP_DIV,       '/',	ASSO_L,     13)
 xx(TK_OP_BAND,      '&',	ASSO_L,     8)

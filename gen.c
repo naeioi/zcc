@@ -147,15 +147,15 @@ void gen_print_func_ir(func_st* func) {
         
         //fprintf(stderr, "inst=%x\n", inst);
         if(inst->op == IR_ASSIGN) {
-            printf("mov\t");
+            printf("mov ");
             print_var_t(args[0]); print_var_t(args[1]); 
         }
         else if(inst->op == IR_ADD) {
-            printf("add\t");
+            printf("add ");
             print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
         }
         else if(inst->op == IR_CALL) {
-            printf("mov\t");
+            printf("mov ");
             print_var_t(args[1]); 
             printf("call %s", ((func_st*)args[0])->name); 
             print_args(args[2]);
@@ -172,6 +172,39 @@ void gen_print_func_ir(func_st* func) {
         else if(inst->op == IR_CJMP) {
             printf("cjmp %s %s", name_var(args[0]), name_label(args[1]));
         }
+        else if(inst->op == IR_LT) {
+            printf("lt ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_LE) {
+            printf("le ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_EQ) {
+            printf("eq ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_GT) {
+            printf("gt ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_GE) {
+            printf("ge ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_NEQ) {
+            printf("neq ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_INC) {
+            printf("inc ");
+            print_var_t(args[0]);
+        }
+        else if(inst->op == IR_DEC) {
+            printf("dec ");
+            print_var_t(args[0]);
+        }
+        else fexit("Unexpected IR instruction");
         printf("\n");
     }
     printf("\n");
