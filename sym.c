@@ -22,10 +22,6 @@ int sym_init() {
      context.types = make_list();
      context.funcs = make_list();
      
-     context.ifT = context.ifF = context.ifE =
-     context.whileB = context.whileE = 
-     context.forB = context.forE = NULL;
-     
      /* add native types */
      type_int = malloc(sizeof(int));
      type_int->bytes = sizeof(int);
@@ -52,11 +48,15 @@ scope_st* sym_make_scope() {
     scope_st *scope = malloc(sizeof(scope_st));
     scope->up = NULL;
     scope->vars = make_list();
+    scope->forB = scope->forE = scope->forC = NULL;
     return scope;
 }
 
 void sym_push_scope(scope_st *scope) {
     scope->up = context.scope;
+    scope->forB = scope->up->forB;
+    scope->forC = scope->up->forC;
+    scope->forE = scope->up->forE;
     context.scope = scope;
 }
 

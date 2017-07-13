@@ -10,8 +10,16 @@
 /* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
 
 int _prs_depth = -1;
+#define PRT_LEAVING
 #define PRS_FUNC_BG _prs_depth++;
-#define PRS_FUNC_ED _prs_depth--;
+#ifdef PRT_LEAVING
+#define PRS_FUNC_ED \
+    PT_PRT_IND\
+    fprintf(stderr, "%s() leaving\n", __FUNCTION__); \
+    _prs_depth--;
+#else
+#define PRS_FUNC_ED _prs_depth--;    
+#endif
 #define PT_PRT_IND \
     { int _i = _prs_depth; \
     while(_i--) fprintf(stderr, "- "); }
@@ -385,6 +393,7 @@ var_st* prs_primary() {
         
         if(lex_token.tk_str[0] != '(') {
             /* => identifer */
+            fprintf(stderr, "finding var[%s]\n", vname);
             r = sym_find_var(vname);
             //assert(r);
             if(!r) {
@@ -572,12 +581,13 @@ int prs_stmt_while() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
     
+    sym_mnp_scope();
+    
     var_st *cond;
     label_st *forC = sym_make_label(), *forB = sym_make_label(), *forE = sym_make_label();
     context.scope->forB = forB; 
     context.scope->forE = forE; 
     context.scope->forC = forC;
-    var_st *cond;
     
     gen_emit(IR_LABEL, forC);
     lex_next();
@@ -591,9 +601,7 @@ int prs_stmt_while() {
     prs_stmt();
     gen_emit(IR_LABEL, forE);
     
-    context.scope->forC = 
-    context.scope->forB = 
-    context.scope->forE = NULL;
+    sym_pop_scope();
     return 0;
 }
 
@@ -601,10 +609,12 @@ int prs_stmt_dowhile() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
 
+    sym_mnp_scope();
+    
+    var_st *cond;
     label_st *forB = sym_make_label(), *forE = sym_make_label();
     context.scope->forB = forB; 
     context.scope->forE = forE; 
-    var_st *cond;
     
     gen_emit(IR_LABEL, forB);
     lex_next();
@@ -617,8 +627,7 @@ int prs_stmt_dowhile() {
     prs_expect_char(';'); lex_next();
     gen_emit(IR_LABEL, forE);
     
-    context.scope->forB = 
-    context.scope->forE = NULL;
+    sym_pop_scope();
     return 0;
 }
 
@@ -626,11 +635,14 @@ int prs_stmt_for() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
     
+    sym_mnp_scope();
+    
+    var_st *cond;
     label_st *forB = sym_make_label(), *forC = sym_make_label(), *forE = sym_make_label();
+    label_st *forI = sym_make_label();
     context.scope->forB = forB; 
     context.scope->forE = forE; 
     context.scope->forC = forC;
-    var_st *cond;
     
     lex_next();
     prs_expect_char('('); lex_next();
@@ -646,6 +658,7 @@ int prs_stmt_for() {
     }
     prs_expect_char(';'); lex_next();
     if(lex_token.tk_str[0] != ')') {
+        gen_emit(IR_LABEL, forI);
         prs_expr();
         gen_emit(IR_JMP, forC);
     }
@@ -653,12 +666,10 @@ int prs_stmt_for() {
     
     gen_emit(IR_LABEL, forB);
     prs_stmt();
-    gen_emit(IR_JMP, forC);
+    gen_emit(IR_JMP, forI);
     gen_emit(IR_LABEL, forE);
     
-    context.scope->forC = 
-    context.scope->forB = 
-    context.scope->forE = NULL;
+    sym_pop_scope();
     return 0;
 }
 
