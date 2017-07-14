@@ -92,6 +92,12 @@ scope_st* sym_mnp_scope() {
 }
 
 var_st* sym_make_var(char* name, type_st* type) {
+    if(sym_redefined_var(name)) {
+        fprintf(stderr, "Fatal: var[name=%s] redefine.\n", name);
+        fexit("");
+        return NULL;
+    }
+    
     var_st *var = malloc(sizeof(var_st));
     var->name = dup_str(name);
     var->type = type;
@@ -106,7 +112,7 @@ var_st* sym_make_var(char* name, type_st* type) {
 }
 
 /* add to scope */
-var_st* sym_add_var(var_st *var) {
+var_st* sym_add_var(var_st *var) {    
     func_st *func   = context.func;
     scope_st *scope = context.scope;
     list_st  *vars  = scope->vars;
@@ -201,8 +207,26 @@ var_st* sym_make_imm(token_st* tk) {
     return var;
 }
 
+int sym_redefined_var(char *name) {
+    scope_st *scope = context.scope;
+    list_st  *vars = scope->vars;
+    int i;
+    assert(vars);
+    for(i = 0; i < vars->len; i++) {
+        if(strcmp(name, ((var_st*)vars->elems[i])->name) == 0)
+            return 1;
+    }
+    return 0;
+}
+
 /* make var and add to scope */
 var_st* sym_make_par(char* name, type_st* type) {
+    if(sym_redefined_var(name)) {
+        fprintf(stderr, "Fatal: var[name=%s] redefine.\n", name);
+        fexit("");
+        return NULL;
+    }
+    
     func_st *func = context.func;
     list_st *pars = func->pars;
     var_st *var = malloc(sizeof(var_st));

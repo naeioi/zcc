@@ -201,6 +201,7 @@ scope_st*   sym_make_scope();
 scope_st*   sym_mnp_scope(); /* make and push scope to context */
 void   sym_push_scope(scope_st*);
 void   sym_pop_scope();
+int         sym_redefined_var(char*);
 var_st*     sym_make_var(char*, type_st*);
 var_st*     sym_find_var(char*);
 var_st*     sym_add_var(var_st*);
