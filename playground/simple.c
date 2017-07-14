@@ -6,7 +6,10 @@ int add(int a, int b) {
 }
 
 int main() {
-    a = 1;
+    a = a > 2;
+    if(a > 10) {
+        return 0;
+    }
     int c = add(a, 2);
     printf(str, c);
     return 0;

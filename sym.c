@@ -94,7 +94,7 @@ var_st* sym_add_var(var_st *var) {
     scope_st *scope = context.scope;
     list_st  *vars  = scope->vars;
     list_append(vars, var);
-    /* reserve space for local variable */
+    /* allocate space for local variable in stack frame */
     if(func != wrap_func) {
         var->addr = func->rbytes;
         func->rbytes += 8; /* max size for var is 8 bytes */
@@ -138,6 +138,7 @@ var_st* sym_make_temp_var(type_st *type) {
     else {
         var = malloc(sizeof(var_st));
         var->irname = NULL;
+        /* allocate space in stack frame */
         var->addr = func->rbytes;
         func->rbytes += 8; /* always align to 8 bytes */
         /* dont add to scope */
@@ -182,6 +183,10 @@ var_st* sym_make_par(char* name, type_st* type) {
     var->lvalue = 1;
     var->irname = NULL;
     list_append(pars, var);
+    /* add to scope. Note that sym_add_var() will allocate space in stack frame. 
+     * this is intended for it's easier to manipulte linear stack-placed args 
+     * (rather than part in register and part on stack)
+     */
     sym_add_var(var);
     return var;
 }

@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <assert.h>
 
+static list_st *tvars;
+static list_st *tlabels; /* label should be global across assembly */
+static char* name_var(var_st *);
+
 static void emit(inst_st* inst) {
     func_st *func  = context.func;
     assert(func);
@@ -46,10 +50,6 @@ void gen_emit_call(ir_op_en op, func_st* func, var_st *rvar, list_st *args) {
     inst->args[0] = func; inst->args[1] = rvar; inst->args[2] = args;
     emit(inst);
 }
-
-static list_st *tvars;
-static list_st *tlabels;
-static char* name_var(var_st *);
 
 static void print_var(var_st *v) {
     //printf("[addr=%x]", v);
@@ -116,7 +116,7 @@ void gen_print_func_ir(func_st* func) {
     list_st *insts = func->insts;
     list_st *args  = func->pars;
     tvars   = make_list();
-    tlabels = make_list();
+    tlabels = make_list(); /* label should be global. but leave it here. */
     int i;
     
     printf("Func[name=%s, rtype=%s, rvar=%s, args=["
