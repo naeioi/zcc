@@ -7,7 +7,9 @@ struct type_st;
 struct context_st;
 struct func_st;
 struct var_st;
-union value_un;
+union  value_un;
+struct token_st;
+enum ir_op_en
 
 typedef struct type_st {
     int bytes;
@@ -99,18 +101,11 @@ enum lex_ecode_en {
 };
 
 typedef enum tk_class_en {
-    TK_PLACEHOLDER = 1,
+    TK_NO_CLASS = 0,
     // keywords 
     #define xx(tk_class, u) tk_class,
     #include "keywords.h"
     #undef xx
-    /* 
-    TK_INT = 1,
-    TK_CHAR,
-    TK_VOID,
-    TK_RETURN,
-    TK_CONST,
-    */
     // constant 
     TK_CONST_INT,
     TK_CONST_CHAR,
@@ -152,7 +147,7 @@ extern func_st    *wrap_func;
  
 /* =-- forward declaration --= */
 
-/* lex */
+/* == lex == */
 int lex_load_file(const char *);
 void lex_print_token(token_st *);
 void lex_init();
@@ -163,7 +158,7 @@ int lex_isunaryop(token_st*);
 int lex_isassignop(token_st*);
 int lex_valid();
 
-/* parse */
+/* == parse == */
 void prs_init();
 int prs_expect_char(char);
 int prs_expect_class(tk_class_en);
@@ -192,7 +187,7 @@ int prs_decls();
 int prs_decl();
 type_st* prs_decl_spec();
 
-/* sym */
+/* == sym == */
 int sym_init();
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
@@ -216,7 +211,7 @@ void        sym_add_type(type_st*);
 label_st*   sym_make_label();
 type_st*    pointer_of(type_st*);
 
-/* gen */
+/* == gen == */
 void gen_emit0(ir_op_en);
 void gen_emit1(ir_op_en, void*);
 void gen_emit2(ir_op_en, void*, void*);
@@ -224,7 +219,9 @@ void gen_emit3(ir_op_en, void*, void*, void*);
 void gen_emit_call(ir_op_en, func_st*, var_st*, list_st*);
 void gen_print_func_ir(func_st*);
 
-/* target-specific gen */
+/* target-specific gen 
+ * link gen-x.c to support different target
+ */
 void gen_assembly(FILE*);
 
 /* util */

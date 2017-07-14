@@ -101,7 +101,7 @@ int lex_next() {
         if(c >= 0) {
             if(c == '/') {
                 /* "//" comment */
-                while((c = lex_getc()) != '\n') lex_getc();
+                while((c = lex_getc()) != '\n'); lex_getc();
             }
             else if(c == '*') {
                 /* "/*" comment */
