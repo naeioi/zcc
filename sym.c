@@ -11,6 +11,8 @@ context_st context;
 
 type_st* type_int;
 type_st* type_int_ptr;
+type_st* type_char;
+type_st* type_char_ptr;
 func_st* wrap_func;
 static list_st *disposed_temp_vars;
 
@@ -22,6 +24,7 @@ int sym_init() {
      context.scope = sym_make_scope();
      context.types = make_list();
      context.funcs = make_list();
+     context.cstr  = make_list();
      
      /* add native types */
      type_int = malloc(sizeof(int));
@@ -37,6 +40,20 @@ int sym_init() {
      type_int_ptr->ref = type_int;
      type_int_ptr->name = NULL;
      sym_add_type(type_int_ptr);
+     
+     type_char = malloc(sizeof(char));
+     type_char->bytes = sizeof(char);
+     type_char->native = 1;
+     type_char->ref = NULL;
+     type_char->name = "char";
+     sym_add_type(type_char);
+     
+     type_char_ptr = malloc(sizeof(char*));
+     type_char_ptr->bytes = sizeof(char*);
+     type_char_ptr->native = 1;
+     type_char_ptr->ref = type_char;
+     type_char_ptr->name = NULL;
+     sym_add_type(type_char_ptr);
      
      disposed_temp_vars = NULL;
      
@@ -163,11 +180,24 @@ var_st* sym_make_imm(token_st* tk) {
     var->irname = NULL;
     var->addr = -1;
     /* support only int for now */
-    var->type = tk->tk_class == TK_CONST_INT ? type_int : NULL;
-    var->name = NULL;
-    var->value = dup_value(tk->value);
-    var->ispar = 0;
-    var->lvalue = 0;
+    if(tk->tk_class == TK_CONST_INT) {
+        var->type = type_int;
+        var->name = NULL;
+        var->value = dup_value(tk);
+        var->ispar = 0;
+        var->lvalue = 0;
+    }
+    else if(tk->tk_class == TK_CONST_STRING) {
+        var->type = type_char_ptr;
+        var->name = NULL;
+        var->value = dup_value(tk);
+        var->ispar = 0;
+        var->lvalue = 0;
+        list_append(context.cstr, var);
+    }
+    else {
+        fexit("Unsupported const type");
+    }
     return var;
 }
 
@@ -210,6 +240,19 @@ func_st* sym_make_func(char* name, type_st* rtype) {
      * this simplify IR_RETURN. (i.e. not need to pass argument by IR_RETURN)
      */
     func->ret = rtype ? sym_make_temp_var(rtype) : NULL;
+    
+    return func;
+}
+
+/* workaround for call to printf, which can only be undeclared in current implementation */
+func_st* sym_make_temp_func(char* name, type_st* rtype) {
+    func_st *func = malloc(sizeof(func_st));
+    func->name = dup_str(name);
+    func->rtype = rtype;
+    func->pars  = NULL;
+    func->insts = NULL;
+    func->ret   = NULL;
+    func->rbytes = 0;
     
     return func;
 }

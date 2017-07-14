@@ -10,7 +10,7 @@
 /* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
 
 int _prs_depth = -1;
-//#define PRT_LEAVING
+#define PRT_LEAVING
 #define PRS_FUNC_BG _prs_depth++;
 #ifdef PRT_LEAVING
 #define PRS_FUNC_ED \
@@ -411,8 +411,11 @@ var_st* prs_primary() {
             list_st *pars = prs_args();
             func_st *func = sym_find_func(vname);
             if(!func) {
-                fprintf(stderr, "%s() not found\n", vname);
-                fexit("");
+                fprintf(stderr, "Warning: function call of var[name=%s] not declared\n", vname);
+                /* TODO: 
+                 * for now, regard undeclared function return int.
+                 */
+                func = sym_make_temp_func(vname, type_int);
             }
             r = sym_make_temp_var(func->rtype);
             gen_emit_call(IR_CALL, func, r, pars);
@@ -431,8 +434,8 @@ var_st* prs_primary() {
     else if(lex_token.tk_class == TK_CONST_STRING) {
         PT_PRT_IND
         fprintf(stderr, "prs_primary[CONST=\"%s\"]\n", lex_token.tk_str);
-        lex_next();
         r = sym_make_imm(&lex_token);
+        lex_next();
     }
     else if(lex_token.tk_str[0] == '(') {
         lex_next();

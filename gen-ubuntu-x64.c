@@ -27,6 +27,21 @@ static char* name_label(label_st *label_) {
 
 static void gen_global(func_st* f) {
     /* TODO: support global variable */
+    
+    /* put constant string in .rodata */
+    char sname[56];
+    list_st *cstr = context.cstr;
+    var_st  *sv;
+    int i;
+    
+    prt("\t .section\t .rodata\n");
+    for(i = 0; i < cstr->len; i++) {
+        sv = cstr->elems[i];
+        sprintf(sname, "S%d", i);
+        sv->irname = dup_str(sname);
+        prt(".%s:\n", sname);
+        prt("\t .string \"%s\"\n", sv->value->s);
+    }
 }
 
 /***
@@ -40,7 +55,10 @@ static char* v2a(var_st *v) {
     static char str[256];
     /* TODO: support other types */
     if(v->value) {
-        sprintf(str, "$%d", v->value->i);
+        if(v->type == type_int) 
+            sprintf(str, "$%d", v->value->i);
+        else if(v->type == type_char_ptr)
+            sprintf(str, "$.%s", v->irname);
     }
     else {
         sprintf(str, "%d(%%rbp)", ldd(v));
@@ -123,12 +141,24 @@ static void gen_func(func_st *f) {
             var_st *r = args[1];
             list_st *fargs = args[2];
             for(j = 0; j < fargs->len && j < 6; j++) {
-                prt("\t mov\t %s, %%ebx\n", v2a(fargs->elems[j]));
-                prt("\t mov\t %%rbx, %%%s\n", regs[j]);
+                var_st *var = fargs->elems[j];
+                if(var->value) {
+                    prt("\t mov\t %s, %%%s\n", v2a(var), regs[j]);
+                }
+                else {
+                    prt("\t mov\t %s, %%ebx\n", v2a(fargs->elems[j]));
+                    prt("\t mov\t %%rbx, %%%s\n", regs[j]);
+                }
             }
             for(j = fargs->len-1; j >= 6; j--) {
-                prt("\t mov\t %s, %%ebx\n", v2a(fargs->elems[j]));
-                prt("\t push\t %%rbx\n");
+                var_st *var = fargs->elems[j];
+                if(var->value) {
+                    prt("\t push\t %s\n", v2a(var));
+                }
+                else{
+                    prt("\t mov\t %s, %%ebx\n", v2a(fargs->elems[j]));
+                    prt("\t push\t %%rbx\n");
+                }
             }
             prt("\t call\t%s\n", func->name);
             prt("\t mov\t%%eax, %d(%%rbp)\n", ldd(r));

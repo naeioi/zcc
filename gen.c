@@ -56,8 +56,8 @@ static void print_var(var_st *v) {
     if(v->value) {
         printf("const[");
         if(v->type == type_int) printf("%d]", v->value->i);
-        else {
-            /* TODO */
+        else if(v->type == type_char_ptr) {
+            printf("%s]", v->value->s);
         }
     }
     else {

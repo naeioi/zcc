@@ -63,6 +63,7 @@ typedef struct context_st {
     struct func_st  *func;
     struct list_st  *funcs; /* list of func_st* */
     struct list_st  *types; /* list of type_st*. in C, types are global */
+    struct list_st  *cstr;  /* list of var_st*, const string */
 } context_st;
 
 typedef enum ir_op_en {
@@ -145,6 +146,8 @@ extern token_st   lex_token;
 extern context_st context; 
 extern type_st    *type_int;
 extern type_st    *type_int_ptr;
+extern type_st    *type_char;
+extern type_st    *type_char_ptr;
 extern func_st    *wrap_func; 
  
 /* =-- forward declaration --= */
@@ -206,6 +209,7 @@ void        sym_dispose_temp_var(var_st*);
 var_st*     sym_make_imm(token_st*);
 var_st*     sym_make_par(char*, type_st*);
 func_st*    sym_make_func(char*, type_st*);
+func_st*    sym_make_temp_func(char*, type_st*);
 func_st*    sym_find_func(char*);
 void        sym_add_type(type_st*);
 label_st*   sym_make_label();
@@ -225,7 +229,7 @@ void gen_assembly(FILE*);
 /* util */
 void fexit(const char *format, ...);
 char* dup_str(char*);
-value_un* dup_value(value_un*);
+value_un* dup_value(token_st*);
 list_st* make_list();
 void*   list_append(list_st*, void*);
 void*   list_pop(list_st*);

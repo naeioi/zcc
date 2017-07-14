@@ -19,9 +19,12 @@ char* dup_str(char* s) {
     return t;
 }
 
-value_un *dup_value(value_un *val) {
+value_un *dup_value(token_st *tk) {
     value_un *r = malloc(sizeof(value_un));
-    memcpy(r, val, sizeof(value_un));
+    if(tk->tk_class == TK_CONST_INT)
+        memcpy(r, tk->value, sizeof(value_un));
+    else if(tk->tk_class == TK_CONST_STRING)
+        r->s = dup_str(tk->tk_str);
     return r;
 }
 
