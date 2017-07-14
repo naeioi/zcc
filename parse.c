@@ -817,11 +817,12 @@ int prs_stmt() {
         
         lex_next();
         
+        sym_mnp_scope();
         prs_decls();
         while(lex_token.tk_str[0] != '}') {
             prs_stmt();
         }
-        
+        sym_pop_scope();
         prs_expect_char('}'); lex_next(); 
         
         PT_PRT_IND
