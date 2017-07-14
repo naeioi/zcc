@@ -205,6 +205,12 @@ func_st* sym_make_func(char* name, type_st* rtype) {
     
     if(disposed_temp_vars) free(disposed_temp_vars);
     disposed_temp_vars = make_list();
+    
+    /* reserve space in stack frame for return value 
+     * this simplify IR_RETURN. (i.e. not need to pass argument by IR_RETURN)
+     */
+    func->ret = rtype ? sym_make_temp_var(rtype) : NULL;
+    
     return func;
 }
 

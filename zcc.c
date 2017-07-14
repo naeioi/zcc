@@ -91,6 +91,23 @@ void test_asm(char *filename) {
     gen_assembly(stdout);
 }
 
+void to_asm(char *infile, char *outfile) {
+    lex_load_file(infile);
+    lex_next();
+    
+    prs_init();
+    sym_init();
+    prs_decls();
+    
+    fprintf(stderr, "Parse done.\n");
+    
+    list_st *funcs = context.funcs;
+    fprintf(stderr, "Read %d funcs.\n", funcs->len);
+    
+    FILE *fp = fopen(outfile, "w");
+    gen_assembly(fp);
+}
+
 int main(int argc, char **argv)
 {
     init(argc, argv);
@@ -108,4 +125,7 @@ int main(int argc, char **argv)
         test_ir(argv[2]);
     if(argc == 3 && strcmp("-a" , argv[1]) == 0)
         test_asm(argv[2]);
+    if(argc == 5 && strcmp("-a" , argv[1]) == 0 && strcmp("-o", argv[3]) == 0) {
+        to_asm(argv[2], argv[4]);
+    }
 }   

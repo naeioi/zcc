@@ -151,8 +151,10 @@ void gen_print_func_ir(func_st* func) {
             printf("mov ");
             print_var_t(args[0]); print_var_t(args[1]); 
         }
-        else if(inst->op == IR_ADD) {
-            printf("add ");
+        else if(inst->op == IR_ADD || inst->op == IR_MUL || inst->op == IR_SUB) {
+            printf("%s ", inst->op == IR_ADD ? "add" :
+                          inst->op == IR_SUB ? "sub" :
+                          inst->op == IR_MUL ? "mul" : "unknown");
             print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
         }
         else if(inst->op == IR_CALL) {

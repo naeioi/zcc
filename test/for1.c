@@ -14,3 +14,8 @@ int mul(int a, int cnt) {
     }
     return r;
 }
+
+int main() {
+    int a = mul(1, 10);
+    return 0;
+}

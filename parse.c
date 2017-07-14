@@ -382,7 +382,7 @@ function-call:
 var_st* prs_primary() {
     PRS_FUNC_BG
     
-    static char vname[256];
+    char vname[56];
     var_st* r = NULL;
     
     if(lex_token.tk_class == TK_IDENTIFIER) {
@@ -406,10 +406,14 @@ var_st* prs_primary() {
             /* => function-call */
             lex_next();
             PT_PRT_IND
-            printf("prs_primary[call=%s()]\n", lex_token.tk_str);
+            printf("prs_primary[call=%s()]\n", vname);
             
             list_st *pars = prs_args();
             func_st *func = sym_find_func(vname);
+            if(!func) {
+                fprintf(stderr, "%s() not found\n", vname);
+                fexit("");
+            }
             r = sym_make_temp_var(func->rtype);
             gen_emit_call(IR_CALL, func, r, pars);
             
@@ -438,6 +442,8 @@ var_st* prs_primary() {
         lex_next();
     }
     else {
+        PT_PRT_IND
+        fprintf(stderr, "In primary(): token[%s]\n", lex_token.tk_str);
         PT_PRT_IND
         fexit("In primary(): Unexpected token");
     }
@@ -717,12 +723,16 @@ int prs_stmt_return() {
     PT_PRT_IND
     fprintf(stderr, "[keyword=%s]\n", lex_token.tk_str);
     
+    var_st *v = NULL;
+    
     lex_next();
     if(lex_token.tk_str[0] != ';') {
-        context.func->ret = prs_expr();
+        v = prs_expr();
     }
     prs_expect_char(';'); lex_next();
     
+    if(context.func->ret && v)
+       gen_emit(IR_ASSIGN, context.func->ret, v);
     gen_emit(IR_RETURN);
     
     return 0;
@@ -917,6 +927,7 @@ int prs_decl() {
          
          scope_st *nscope = sym_mnp_scope();
          func_st  *nfunc  = sym_make_func(vname, type);
+         list_append(context.funcs, nfunc); /* should append early to allow recursive */
          
          if(lex_token.tk_str[0] != ')') {
              /* parse parameters */
@@ -952,7 +963,6 @@ int prs_decl() {
          prs_stmt();
          
          sym_pop_scope();
-         list_append(context.funcs, nfunc);
          context.func = wrap_func;
          
     }
