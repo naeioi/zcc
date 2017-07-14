@@ -152,6 +152,7 @@ void gen_print_func_ir(func_st* func) {
             print_var_t(args[0]); print_var_t(args[1]); 
         }
         else if(inst->op == IR_ADD || inst->op == IR_MUL || inst->op == IR_SUB) {
+            //fprintf(stderr, "inst[addr=%x, arg0=%x, arg1=%x, arg2=%x]\n", inst, args[0], args[1], args[2]);
             printf("%s ", inst->op == IR_ADD ? "add" :
                           inst->op == IR_SUB ? "sub" :
                           inst->op == IR_MUL ? "mul" : "unknown");

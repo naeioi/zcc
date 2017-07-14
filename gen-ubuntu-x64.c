@@ -160,6 +160,10 @@ static void gen_func(func_st *f) {
                     prt("\t push\t %%rbx\n");
                 }
             }
+            /* %rax set to number of floating argments. 
+             * ref. System V ABI https://software.intel.com/sites/default/files/article/402129/mpx-linux64-abi.pdf
+             */
+            prt("\t mov $0, %%rax\n"); 
             prt("\t call\t%s\n", func->name);
             prt("\t mov\t%%eax, %d(%%rbp)\n", ldd(r));
         }

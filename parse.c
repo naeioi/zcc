@@ -263,7 +263,7 @@ var_st* prs_unary() {
             /* => '(' type-name ')' unary-expression */
             lex_next();
             prs_expect_char(')'); lex_next();
-            prs_unary();
+            prs_unary(); /* TODO */
         }
         else {
             /* TRICK: parsed primary-expression for postfix-expression
@@ -273,7 +273,7 @@ var_st* prs_unary() {
              */
              var_st *var = prs_expr();
              prs_expect_char(')'); lex_next();
-             prs_pst(var);
+             r = prs_pst(var);
         }
     }
     else if(lex_isunaryop(&lex_token)) {
@@ -310,7 +310,7 @@ var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) 
     PRS_FUNC_BG
     PT_FUNC
     
-    var_st *r = NULL, *t;
+    var_st *r = passed_primary, *t;
     
     if(!passed_primary)
         r = prs_primary();
@@ -464,6 +464,7 @@ list_st* prs_args() {
     PT_FUNC
     
     list_st *args = make_list();
+    if(lex_token.tk_str[0] == ')') return args;
     
     int i = 0;
     while(1) {
