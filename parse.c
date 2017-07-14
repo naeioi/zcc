@@ -550,8 +550,15 @@ int prs_stmt_if() {
     cond = prs_expr();
     prs_expect_char(')'); lex_next();
     
-    gen_emit(IR_CJMP, cond, ifT);
-    gen_emit(IR_JMP, ifF);
+    if(cond->value) {
+        if(cond->value->i) gen_emit(IR_JMP, ifT);
+        else gen_emit(IR_JMP, ifF);
+    }
+    else {
+        gen_emit(IR_CJMP, cond, ifT);
+        gen_emit(IR_JMP, ifF);
+    }
+    
     sym_dispose_temp_var(cond);
     gen_emit(IR_LABEL, ifT);
     prs_stmt();
@@ -603,9 +610,16 @@ int prs_stmt_while() {
     cond = prs_expr();
     prs_expect_char(')'); lex_next();
     
-    gen_emit(IR_CJMP, cond, forB);
+    if(cond->value) {
+        /* deterministic branch */
+        if(cond->value->i) gen_emit(IR_JMP, forB);
+        else gen_emit(IR_JMP, forE);
+    }
+    else {
+        gen_emit(IR_CJMP, cond, forB);
+        gen_emit(IR_JMP, forE);
+    }
     sym_dispose_temp_var(cond);
-    gen_emit(IR_JMP, forE);
     gen_emit(IR_LABEL, forB);
     prs_stmt();
     gen_emit(IR_LABEL, forE);

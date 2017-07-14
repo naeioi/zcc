@@ -113,3 +113,68 @@ fac:
 
 .L6:
 
+	 .globl	fac2
+	 .type	fac2, @function
+fac2:
+	 pushq	%rbp
+	 movq	%rsp, %rbp
+	 subq	$48, %rsp
+	 mov	%rdi, -16(%rbp)
+
+	 mov	 $2, %edi
+	 mov	 %edi, -24(%rbp)
+
+	 mov	 $1, %edi
+	 mov	 %edi, -32(%rbp)
+
+.L7:
+
+	 jmp	.L8
+
+.L8:
+
+	 mov	 -24(%rbp), %edi
+	 cmp	 -16(%rbp), %edi
+	 setg	 %al
+	 movzx	 %al, %eax
+	 mov	 %eax, -40(%rbp)
+
+	 cmpl	 $1, -40(%rbp)
+	 je	 .L9
+
+	 jmp	.L10
+
+.L9:
+
+	 jmp	.L11
+
+	 jmp	.L10
+
+.L10:
+
+	 mov	 -24(%rbp), %ebx
+	 mov	 %rbx, %rdi
+	 mov	 -32(%rbp), %ebx
+	 mov	 %rbx, %rsi
+	 call	mul
+	 mov	%eax, -40(%rbp)
+
+	 mov	 -40(%rbp), %edi
+	 mov	 %edi, -32(%rbp)
+
+	 jmp	.L7
+
+	 mov	 -32(%rbp), %edi
+	 mov	 %edi, -40(%rbp)
+
+	 incl 	 -32(%rbp)
+
+.L11:
+
+	 mov	 -32(%rbp), %edi
+	 mov	 %edi, -8(%rbp)
+
+	 mov	 -8(%rbp), %eax
+	 leave
+	 ret
+
