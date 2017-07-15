@@ -9,7 +9,7 @@ struct func_st;
 struct var_st;
 union  value_un;
 struct token_st;
-enum ir_op_en
+enum ir_op_en;
 
 typedef struct type_st {
     int bytes;
@@ -24,6 +24,8 @@ typedef struct func_st {
     struct list_st *pars; /* list of var_st */
     struct list_st *insts;
     struct var_st  *ret;
+    int declared;
+    int defined;
     /* for gen */
     int rbytes; /* bytes should reserved for local variables */
 } func_st;
@@ -214,11 +216,12 @@ var_st*     sym_make_var(char*, type_st*);
 var_st*     sym_find_var(char*);
 var_st*     sym_add_var(var_st*);
 var_st*     sym_make_temp_var(type_st*);
-var_st*     sym_make_temp_lvar(type_st*);
+var_st*     sym_make_temp_lvar(type_st*, int);
 void        sym_dispose_temp_var(var_st*);
 var_st*     sym_make_imm(token_st*);
 var_st*     sym_make_par(char*, type_st*);
 func_st*    sym_make_func(char*, type_st*);
+int         sym_is_full_pars(func_st*);
 func_st*    sym_make_temp_func(char*, type_st*);
 func_st*    sym_find_func(char*);
 void        sym_add_type(type_st*);
@@ -241,6 +244,7 @@ void gen_assembly(FILE*);
 /* util */
 void fexit(const char *format, ...);
 char* dup_str(char*);
+var_st*   dup_temp_var(var_st*);
 value_un* dup_value(token_st*);
 list_st* make_list();
 void*   list_append(list_st*, void*);
@@ -251,3 +255,5 @@ int     list_index(list_st*, void*);
 /*==-- Macros --==*/
 #define EMIT_M_MACRO(_0,_1,_2, _3, NAME, ...) NAME
 #define gen_emit(...) EMIT_M_MACRO(__VA_ARGS__, gen_emit3, gen_emit2, gen_emit1, gen_emit0)(__VA_ARGS__)
+
+#define DEMINER fprintf(stderr, "Run upon Line %d\n", __LINE__);

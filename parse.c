@@ -10,7 +10,7 @@
 /* Assumption: all tokens before lex_token are parsed. lex_token is the next to be parsed. */
 
 int _prs_depth = -1;
-#define PRT_LEAVING
+//#define PRT_LEAVING
 #define PRS_FUNC_BG _prs_depth++;
 #ifdef PRT_LEAVING
 #define PRS_FUNC_ED \
@@ -322,7 +322,7 @@ var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) 
             lex_next();
             ind = prs_expr();
             assert(sym_is_pointer(r));
-            t = sym_make_temp_lvar(); /* make lvalue */
+            t = sym_make_temp_lvar(r->type->ref, 1); /* make lvalue */
             gen_emit(IR_IND, t, r, ind);
             sym_dispose_temp_var(r);
             r = t;
@@ -424,7 +424,6 @@ var_st* prs_primary() {
             }
             r = sym_make_temp_var(func->rtype);
             gen_emit_call(IR_CALL, func, r, pars);
-            
             prs_expect_char(')'); lex_next();
         }
     }
@@ -438,7 +437,6 @@ var_st* prs_primary() {
     }
     else if(lex_token.tk_class == TK_CONST_STRING) {
         PT_PRT_IND
-        fprintf(stderr, "prs_primary[CONST=\"%s\"]\n", lex_token.tk_str);
         r = sym_make_imm(&lex_token);
         lex_next();
     }
@@ -860,8 +858,6 @@ int prs_decls() {
         fprintf(stderr, "\n");
     }
     
-    //fprintf(stderr, "%s\n", lex_token.tk_str);
-    
     PRS_FUNC_ED
     return 0;
 }
@@ -939,7 +935,7 @@ int prs_decl() {
     }
     
     /* function declaration */
-    if(lex_token.tk_str[0] == '(') {
+    if(lex_token.tk_str[0] == '(') { lex_next();
         /* => declaration-specifiers func-declarator compound-statement
          * => declaration-specifiers identifer '(' parameter-list ')'
          * where specifier & identifier are already parsed
@@ -947,14 +943,14 @@ int prs_decl() {
          * parameter-list: parameter { , parameter } [ , ... ]
          * parameter: declaration-specifiers identifier
          */
-         lex_next();
          
-         scope_st *nscope = sym_mnp_scope();
+         sym_mnp_scope();
          func_st  *nfunc  = sym_make_func(vname, type);
-         list_append(context.funcs, nfunc); /* should append early to allow recursive */
          
          if(lex_token.tk_str[0] != ')') {
-             /* parse parameters */
+             /* parse parameters 
+              * TODO: wrap in a indepedent parse function
+              */
              while(1) {
                  char    *par_name;
                  type_st *par_type = prs_decl_spec();
@@ -966,29 +962,36 @@ int prs_decl() {
                     
                     par_type = pointer_of(par_type);
                  }
-                 else
-                     prs_expect_class(TK_IDENTIFIER); 
-                
-                 par_name = dup_str(lex_token.tk_str);
-                 sym_make_par(par_name, par_type);
+                 
+                 /* parameter name is not obligatory */
+                 par_name = lex_token.tk_class == TK_IDENTIFIER ? dup_str(lex_token.tk_str) : NULL;
                 
                  PT_PRT_IND
-                 fprintf(stderr, "para[name='%s']\n", lex_token.tk_str);
-                 lex_next();
+                 fprintf(stderr, "para[name='%s']\n", par_name);
+                 if(par_name) lex_next();
                  
+                 /* sym_make_par() should check if parameters declaration is consistent (in case of multiple declarations) */
+                 sym_make_par(par_name, par_type);
                  if(lex_token.tk_str[0] == ',') lex_next();
                  else break;
              }
          }
          
          prs_expect_char(')'); lex_next();
-         prs_expect_char('{'); /* detect { but dont eat it. leave it to prs_stmt() */
+         nfunc->declared = 1;
          
-         prs_stmt();
-         
+         if(lex_token.tk_str[0] == '{') {
+             /* function definition */
+             nfunc->defined = 1;
+             /* make sure parameters all have names */
+             assert(sym_is_full_pars(nfunc));
+             prs_stmt();
+         }
+         else if(lex_token.tk_str[0] == ';') {
+             lex_next();
+         }
          sym_pop_scope();
          context.func = wrap_func;
-         
     }
     else {
         prs_expect_char(';'); lex_next();

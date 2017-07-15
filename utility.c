@@ -12,7 +12,16 @@ void fexit(const char *format, ...) {
     exit(0);
 }
 
+/* duplicate temp var. imm var not included */
+var_st *dup_temp_var(var_st *var) {
+    if(var->lvalue || var->value) return var;
+    var_st *nvar = malloc(sizeof(var_st));
+    memcpy(nvar, var, sizeof(var_st));
+    return nvar;
+}
+
 char* dup_str(char* s) {
+    if(!s) return NULL;
     int len = strlen(s) + 1;
     char *t = malloc(len);
     strcpy(t, s);
@@ -23,8 +32,9 @@ value_un *dup_value(token_st *tk) {
     value_un *r = malloc(sizeof(value_un));
     if(tk->tk_class == TK_CONST_INT)
         memcpy(r, tk->value, sizeof(value_un));
-    else if(tk->tk_class == TK_CONST_STRING)
+    else if(tk->tk_class == TK_CONST_STRING) {
         r->s = dup_str(tk->tk_str);
+    }
     return r;
 }
 

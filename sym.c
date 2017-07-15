@@ -19,11 +19,10 @@ static list_st *disposed_temp_vars;
 int sym_init() {
      
      /* initialize context */
-     context.func  = NULL;
+     context.funcs = make_list();
      context.func  = wrap_func = sym_make_func("(top)", NULL); /* virtual wrap function */
      context.scope = sym_make_scope();
      context.types = make_list();
-     context.funcs = make_list();
      context.cstr  = make_list();
      
      /* add native types */
@@ -178,9 +177,11 @@ var_st* sym_make_temp_var(type_st *type) {
     return var;
 }
 
-var_st* sym_make_temp_lvar(type_st *type) { 
-    var_st *var = sym_make_temp_var();
+/* TODO: explain ref */
+var_st* sym_make_temp_lvar(type_st *type, int ref) { 
+    var_st *var = sym_make_temp_var(type);
     var->lvalue = 1;
+    var->ref = ref;
     return var;
 }
 
@@ -207,6 +208,7 @@ var_st* sym_make_imm(token_st* tk) {
         var->type = type_char_ptr;
         var->name = NULL;
         var->value = dup_value(tk);
+        //fprintf(stderr, "var->value->s=%s\n", var->value->s);
         var->ispar = 0;
         var->lvalue = 0;
         list_append(context.cstr, var);
@@ -229,43 +231,73 @@ int sym_redefined_var(char *name) {
     return 0;
 }
 
-/* make var and add to scope */
+/* make par and add to scope */
 var_st* sym_make_par(char* name, type_st* type) {
-    if(sym_redefined_var(name)) {
-        fprintf(stderr, "Fatal: var[name=%s] redefine.\n", name);
-        fexit("");
-        return NULL;
-    }
+    static func_st *func = NULL;
+    static int par_ind;
     
-    func_st *func = context.func;
+    if(context.func != func) {
+        func = context.func;
+        par_ind = 0;
+    }
+    else par_ind++;
     list_st *pars = func->pars;
-    var_st *var = malloc(sizeof(var_st));
-    var->name = dup_str(name);
-    var->type = type;
-    var->value = NULL;
-    var->ispar = pars->len + 1;
-    var->lvalue = 1;
-    var->irname = NULL;
-    list_append(pars, var);
-    /* add to scope. Note that sym_add_var() will allocate space in stack frame. 
-     * this is intended for it's easier to manipulte linear stack-placed args 
-     * (rather than part in register and part on stack)
-     */
-    sym_add_var(var);
-    return var;
+    
+    if(func->declared) {
+        /* check declaration consistency */
+        var_st *var = pars->elems[par_ind];
+        assert(par_ind < pars->len);
+        assert(var->type == type);
+        sym_add_var(var);
+        return var;
+    }
+    else {        
+        /* add new parameter to list */
+        if(sym_redefined_var(name)) {
+            fprintf(stderr, "Fatal: var[name=%s] redefine.\n", name);
+            fexit("");
+            return NULL;
+        }
+        
+        var_st *var = malloc(sizeof(var_st));
+        var->name = dup_str(name);
+        var->type = type;
+        var->value = NULL;
+        var->ispar = pars->len + 1;
+        var->lvalue = 1;
+        var->irname = NULL;
+        list_append(pars, var);
+        /* add to scope. Note that sym_add_var() will allocate space in stack frame. 
+         * this is intended for it's easier to manipulte linear stack-placed args 
+         * (rather than part in register and part on stack)
+         */
+        sym_add_var(var);
+        return var;
+    }
 }
 
 /* make var and set it as context.func */
-func_st* sym_make_func(char* name, type_st* rtype) {
-    func_st *func = malloc(sizeof(func_st));
+func_st* sym_make_func(char* name, type_st* rtype) {    
+    func_st *func = sym_find_func(name);
+    if(func) {
+        assert(rtype == func->rtype);
+        if(disposed_temp_vars) free(disposed_temp_vars);
+        disposed_temp_vars = make_list();
+        context.func = func;
+        return func;
+    }
+    func = malloc(sizeof(func_st));
     func->name = dup_str(name);
     func->rtype = rtype;
     func->pars  = make_list();
     func->insts = make_list();
     func->ret   = NULL;
     func->rbytes = 0;
+    func->declared = 0;
+    func->defined = 0;
     assert(context.func == NULL || strcmp(context.func->name, "(top)") == 0); /* dont allow nested function */
     context.func = func;
+    list_append(context.funcs, func); /* should append early to allow recursive */
     
     if(disposed_temp_vars) free(disposed_temp_vars);
     disposed_temp_vars = make_list();
@@ -278,7 +310,7 @@ func_st* sym_make_func(char* name, type_st* rtype) {
     return func;
 }
 
-/* workaround for call to printf, which can only be undeclared in current implementation */
+/* workaround for call to printf when pre-declaration is not implemented */
 func_st* sym_make_temp_func(char* name, type_st* rtype) {
     func_st *func = malloc(sizeof(func_st));
     func->name = dup_str(name);
@@ -287,6 +319,8 @@ func_st* sym_make_temp_func(char* name, type_st* rtype) {
     func->insts = NULL;
     func->ret   = NULL;
     func->rbytes = 0;
+    func->declared = 0;
+    func->defined = 0;
     
     return func;
 }
@@ -311,6 +345,17 @@ int sym_is_pointer(var_st* v) {
     return v->type->ref != NULL;
 }
 
+int sym_is_full_pars(func_st* f) {
+    list_st *pars = f->pars;
+    int i, yes = 1;
+    for(i = 0; i < pars->len; i++)
+        if(((var_st*)pars->elems[i])->name == NULL) {
+            yes = 0;
+            break;
+        }
+    return yes;
+}
+
 label_st* sym_make_label() {
     label_st *label = malloc(sizeof(label_st));
     label->func     = context.func;
@@ -328,7 +373,7 @@ type_st* pointer_of(type_st* type) {
     }
     /* pointer type not found. create one */
     type_st *ntype = malloc(sizeof(type_st));
-    ntype->bytes = sizeof(void*);
+    ntype->bytes = 8;
     ntype->native = 0;
     ntype->ref = type;
     ntype->name = NULL;

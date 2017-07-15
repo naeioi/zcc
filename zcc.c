@@ -67,7 +67,8 @@ void test_ir(char *filename) {
     fprintf(stderr, "Parse done.\n");
     
     list_st *funcs = context.funcs;
-    int i = 0;
+    /* start from 1 to skip wrap function */ 
+    int i = 1;
     fprintf(stderr, "Read %d funcs.\n", funcs->len);
     for(; i < funcs->len; i++) {
         printf("\n");
@@ -97,6 +98,7 @@ void to_asm(char *infile, char *outfile) {
     
     prs_init();
     sym_init();
+    //fprintf(stderr, "sym_init\n");
     prs_decls();
     
     fprintf(stderr, "Parse done.\n");

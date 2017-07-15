@@ -29,25 +29,31 @@ void gen_emit0(ir_op_en op) {
 
 void gen_emit1(ir_op_en op, void* var) {
     inst_st *inst = make_inst(op);
-    inst->args[0] = var;
+    /* Note: dup_temp_var is necessary for temp_var 
+     * because its type may change over parsing, although its address remains constant
+     */
+    inst->args[0] = dup_temp_var(var);
     emit(inst);
 }
 
 void gen_emit2(ir_op_en op, void* arg0, void* arg1) {
     inst_st *inst = make_inst(op);
-    inst->args[0] = arg0; inst->args[1] = arg1;
+    inst->args[0] = dup_temp_var(arg0); inst->args[1] = dup_temp_var(arg1);
     emit(inst);
 }
 
 void gen_emit3(ir_op_en op, void* arg0, void* arg1, void* arg2) {
     inst_st *inst = make_inst(op);
-    inst->args[0] = arg0; inst->args[1] = arg1; inst->args[2] = arg2;
+    inst->args[0] = dup_temp_var(arg0); inst->args[1] = dup_temp_var(arg1); inst->args[2] = dup_temp_var(arg2);
     emit(inst);
 }
 
 void gen_emit_call(ir_op_en op, func_st* func, var_st *rvar, list_st *args) {
     inst_st *inst = make_inst(op);
-    inst->args[0] = func; inst->args[1] = rvar; inst->args[2] = args;
+    int i;
+    inst->args[0] = func; inst->args[1] = dup_temp_var(rvar); inst->args[2] = args;
+    for(i = 0; i < args->len; i++)
+        args->elems[i] = dup_temp_var(args->elems[i]);
     emit(inst);
 }
 
@@ -61,7 +67,7 @@ static void print_var(var_st *v) {
         }
     }
     else {
-        type *base = v->type->ref ? v->type->ref : v->type;
+        type_st *base = v->type->ref ? v->type->ref : v->type;
         printf("%s%s[%s]", base->name, base == v->type ? "" : "*", name_var(v));
     }    
     //printf("\t");
@@ -211,7 +217,7 @@ void gen_print_func_ir(func_st* func) {
         }
         else if(inst->op == IR_IND) {
             //var_st *d = args[0], *b = args[1], *i = args[2];
-            ptr("ind ");
+            printf("ind ");
             print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
         }
         else fexit("Unexpected IR instruction");
