@@ -5,8 +5,22 @@
 #include <string.h>
 #include <stdio.h>
 
+/* TODO: optimazation: merge load & save to move */
+
+typedef enum regs_en { RAX=0, RBX, RCX, RDX, RSI, RDI, RBP, R8, R9, R10, R11, R12, R13, R14, R15, RIP } regs_en;
+char *regs_name[] = { "ax", "bx", "cx", "dx", "si", "di", "bp", "8", "9", "10", "11", "12", "13", "14", "15", "ip" };
 static FILE *fp;
 static list_st *tlabels; /* label should be global across assembly */
+
+#define pp(op)   fprintf(fp, "\t " #op "\n")
+#define prt(...) fprintf(fp, __VA_ARGS__)
+#define endl     fprintf(fp, "\n")
+
+#define ld(addr) (-((addr) + 8)) /* offset from %rbp */
+#define ldd(v) ld(((var_st*)v)->addr) /* load varible address */
+
+#define ireg1(op, x)    ireg1_f(#op, x)
+#define ireg2(op, x, y) ireg2_f(#op, x, y)
 
 static char* name_label(label_st *label_) {
     static char str[256];
@@ -20,10 +34,6 @@ static char* name_label(label_st *label_) {
     }
     return label_->irname = label->irname;
 }
-
-#define pp(op)   fprintf(fp, "\t " #op "\n")
-#define prt(...) fprintf(fp, __VA_ARGS__)
-#define endl     fprintf(fp, "\n")
 
 static void gen_global(func_st* f) {
     /* TODO: support global variable */
@@ -49,9 +59,8 @@ static void gen_global(func_st* f) {
  * 1. const
  * 2. variable
  */
-#define ld(addr) (-((addr) + 8)) /* offset from %rbp */
-#define ldd(v) ld(((var_st*)v)->addr) /* load varible address */
 static char* v2a(var_st *v) {
+    /* deprecated */
     static char str[256];
     /* TODO: support other types */
     if(v->value) {
@@ -64,6 +73,69 @@ static char* v2a(var_st *v) {
         sprintf(str, "%d(%%rbp)", ldd(v));
     }
     return str;
+}
+
+void ireg1_f(char* op, regs_en x) {
+    prt("\t %s\t %s\n", op, regs_name[x]);
+}
+
+void ireg2_f(char *op, regs_en x, regs_en y) {
+    prt("\t %s\t %s, %s\n", op, regs_name[x], regs_name[y]);
+}
+
+void load(var_st *v, regs_en r) {
+    char *rprefix = v->type->bytes == 4 ? "e" : "r";
+    char *rname = regs_name[r];
+    if(v->value) {
+        if(v->type == type_int) 
+            prt("\t mov\t $%d, e%s\n", v->value->i, rname);
+        else if(v->type == type_char_ptr)
+            prt("\t mov\t $.%s, r%s\n", v->irname);
+        else 
+            assert("Not supported type");
+    }
+    else {
+        if(v->ref == 0) {
+            if(v->where == STACK_VAR)
+                prt("\t mov\t %d(%%rbp), %s%s\n", ldd(v),  rprefix, rname);
+            else 
+                prt("\t mov\t %s(%%rip), %s%s\n", v->name, rprefix, rname);
+        }
+        else {
+            if(v->where == STACK_VAR) {
+                /* dont use register other than r */
+                prt("\t mov\t %d(%%rbp), r%s\n", ldd(v), rname);
+                prt("\t mov\t (r%s), %s%s\n", rname, rprefix, rname);
+            }
+            else {
+                prt("\t mov\t %s(%%rip), r%s\n", v->name, rname);
+                prt("\t mov\t (r%s), %s%s\n", rname, rprefix, rname);
+            }
+        }
+    }
+}
+
+void save(regs_en r, var_st *v) {
+    char *rprefix = v->type->bytes == 4 ? "e" : "r";
+    char *rname = regs_name[r];
+    assert(v->lvalue);
+    if(v->ref == 0) {
+        if(v->where == STACK_VAR)
+            prt("\t mov\t %s%s, %d(%%rbp)\n", ldd(v),  rprefix, rname);
+        else 
+            prt("\t mov\t %s%s, %s(%%rip)\n", v->name, rprefix, rname);
+    }
+    else {
+        if(v->where == STACK_VAR) {
+            /* dont use register other than r */
+            prt("\t mov\t %d(%%rbp), r%s\n", ldd(v), rname);
+            prt("\t mov\t %s%s, (r%s)\n", rname, rprefix, rname);
+        }
+        else {
+            prt("\t mov\t %s(%%rip), r%s\n", v->name, rname);
+            prt("\t mov\t %s%s, (r%s)\n", rname, rprefix, rname);
+        }
+    }
 }
 
 static void gen_func(func_st *f) {
@@ -88,7 +160,7 @@ static void gen_func(func_st *f) {
     int i, j;
     list_st *insts = f->insts;
     list_st *args  = f->pars;
-    char *regs[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
+    enum regs_en arg_regs[] = { RDI, RSI, RDX, RCX, R8, R9 };
     
     /* place argments on stack 
      * ref. http://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64/
@@ -115,26 +187,29 @@ static void gen_func(func_st *f) {
         
         if(inst->op == IR_ASSIGN) {
             var_st *d = args[0], *s = args[1];
-            prt("\t mov\t %s, %%edi\n", v2a(s));
-            prt("\t mov\t %%edi, %d(%%rbp)\n", ldd(d));
+            load(s, RDI);
+            save(RDI, d);
         }
         else if(inst->op == IR_ADD) {
             var_st *d = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t add\t %s, %%edi\n", v2a(y));
-            prt("\t mov\t %%edi, %d(%%rbp)\n", ldd(d));
+            load(x, RDI);
+            load(y, RSI);
+            ireg2(add, RDI, RSI);
+            save(RSI, d);
         }
         else if(inst->op == IR_SUB) {
             var_st *d = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t sub\t %s, %%edi\n", v2a(y));
-            prt("\t mov\t %%edi, %d(%%rbp)\n", ldd(d));
+            load(x, RDI);
+            load(y, RSI);
+            ireg2(sub, RDI, RSI);
+            save(RSI, d);
         }
         else if(inst->op == IR_MUL) {
             var_st *d = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t imull\t %s, %%edi\n", v2a(y));
-            prt("\t mov\t %%edi, %d(%%rbp)\n", ldd(d));
+            load(x, RDI);
+            load(y, RSI);
+            ireg2(imul, RDI, RSI);
+            save(RSI, d);
         }
         else if(inst->op == IR_CALL) {
             func_st *func = args[0];
@@ -142,34 +217,24 @@ static void gen_func(func_st *f) {
             list_st *fargs = args[2];
             for(j = 0; j < fargs->len && j < 6; j++) {
                 var_st *var = fargs->elems[j];
-                if(var->value) {
-                    prt("\t mov\t %s, %%%s\n", v2a(var), regs[j]);
-                }
-                else {
-                    prt("\t mov\t %s, %%ebx\n", v2a(fargs->elems[j]));
-                    prt("\t mov\t %%rbx, %%%s\n", regs[j]);
-                }
+                load(var, RAX);
+                save(RAX, arg_regs[j]);
             }
             for(j = fargs->len-1; j >= 6; j--) {
                 var_st *var = fargs->elems[j];
-                if(var->value) {
-                    prt("\t push\t %s\n", v2a(var));
-                }
-                else{
-                    prt("\t mov\t %s, %%ebx\n", v2a(fargs->elems[j]));
-                    prt("\t push\t %%rbx\n");
-                }
+                load(var, RAX);
+                ireg1(push, RAX);
             }
             /* %rax set to number of floating argments. 
              * ref. System V ABI https://software.intel.com/sites/default/files/article/402129/mpx-linux64-abi.pdf
              */
             prt("\t mov $0, %%rax\n"); 
             prt("\t call\t%s\n", func->name);
-            prt("\t mov\t%%eax, %d(%%rbp)\n", ldd(r));
+            save(RAX, r);
         }
         else if(inst->op == IR_RETURN) {
             if(f->ret)
-                prt("\t mov\t %s, %%eax\n", v2a(f->ret));
+                move(f->ret, RAX);
             pp(leave);
             pp(ret);
         }
@@ -180,65 +245,85 @@ static void gen_func(func_st *f) {
             prt("\t jmp\t.%s\n", name_label(args[0]));
         }
         else if(inst->op == IR_CJMP) {
-            prt("\t cmpl\t $1, %s\n", v2a(args[0]));
+            loadzx(args[0], RAX);
+            prt("\t cmp\t $1, %%rax\n");
             prt("\t je\t .%s\n", name_label(args[1]));
-            //printf("cjmp %s %s", ldd(args[0]), name_label(args[1]));
         }
         else if(inst->op == IR_LT) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t cmp\t %s, %%edi\n", v2a(y));
+            load(x, RDI);
+            load(t, RSI);
+            ireg2(cmp, RSI, RDI);
             prt("\t setl\t %%al\n");
-            prt("\t movzx\t %%al, %%eax\n");
-            prt("\t mov\t %%eax, %d(%%rbp)\n", ldd(r));
+            prt("\t movzx\t %%al, %%rax\n");
+            save(RAX, r)
         }
         else if(inst->op == IR_LE) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t cmp\t %s, %%edi\n", v2a(y));
+            load(x, RDI);
+            load(t, RSI);
+            ireg2(cmp, RSI, RDI);
             prt("\t setle\t %%al\n");
-            prt("\t movzx\t %%al, %%eax\n");
-            prt("\t mov\t %%eax, %d(%%rbp)\n", ldd(r));
+            prt("\t movzx\t %%al, %%rax\n");
+            save(RAX, r)
         }
         else if(inst->op == IR_EQ) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t cmp\t %s, %%edi\n", v2a(y));
-            prt("\t sete\t %%al\n");
-            prt("\t movzx\t %%al, %%eax\n");
-            prt("\t mov\t %%eax, %d(%%rbp)\n", ldd(r));
+            load(x, RDI);
+            load(t, RSI);
+            ireg2(cmp, RSI, RDI);
+            prt("\t seteq\t %%al\n");
+            prt("\t movzx\t %%al, %%rax\n");
+            save(RAX, r)
         }
         else if(inst->op == IR_GT) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t cmp\t %s, %%edi\n", v2a(y));
+            load(x, RDI);
+            load(t, RSI);
+            ireg2(cmp, RSI, RDI);
             prt("\t setg\t %%al\n");
-            prt("\t movzx\t %%al, %%eax\n");
-            prt("\t mov\t %%eax, %d(%%rbp)\n", ldd(r));
+            prt("\t movzx\t %%al, %%rax\n");
+            save(RAX, r)
         }
         else if(inst->op == IR_GE) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t cmp\t %s, %%edi\n", v2a(y));
+            load(x, RDI);
+            load(t, RSI);
+            ireg2(cmp, RSI, RDI);
             prt("\t setge\t %%al\n");
-            prt("\t movzx\t %%al, %%eax\n");
-            prt("\t mov\t %%eax, %d(%%rbp)\n", ldd(r));
+            prt("\t movzx\t %%al, %%rax\n");
+            save(RAX, r)
         }
         else if(inst->op == IR_NEQ) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            prt("\t mov\t %s, %%edi\n", v2a(x));
-            prt("\t cmp\t %s, %%edi\n", v2a(y));
+            load(x, RDI);
+            load(t, RSI);
+            ireg2(cmp, RSI, RDI);
             prt("\t setne\t %%al\n");
-            prt("\t movzx\t %%al, %%eax\n");
-            prt("\t mov\t %%eax, %d(%%rbp)\n", ldd(r));
+            prt("\t movzx\t %%al, %%rax\n");
+            save(RAX, r)
         }
         else if(inst->op == IR_INC) {
             var_st *v = args[0];
-            prt("\t incl \t %d(%%rbp)\n", ldd(v));
+            load(v, RAX);
+            ireg1(inc, RAX);
+            save(RAX, v);
         }
         else if(inst->op == IR_DEC) {
             var_st *v = args[0];
-            prt("\t decl \t %d(%%rbp)\n", ldd(v));
+            load(v, RAX);
+            ireg1(dec, RAX);
+            save(RAX, v);
+        }
+        else if(inst->op == IR_IND) {
+            /* D <- B[I], A is an lvalue */
+            var_st *d = args[0], *b = args[1], *i = args[2];
+            int size = b->type->ref->bytes;
+            loadsz(i, RAX);
+            prt("\t leaq\t 0(,%%rax,%d), %%rdi\n", size);
+            load(b, RAX);
+            ireg2(add, RAX, RDI);
+            save(RDI, d);
         }
         else fexit("Unexpected IR instruction");
         endl;

@@ -117,6 +117,8 @@ var_st* sym_add_var(var_st *var) {
     scope_st *scope = context.scope;
     list_st  *vars  = scope->vars;
     list_append(vars, var);
+    var->where = STACK_VAR;
+    var->ref   = 0;
     /* allocate space for local variable in stack frame */
     if(func != wrap_func) {
         var->addr = func->rbytes;
@@ -162,6 +164,8 @@ var_st* sym_make_temp_var(type_st *type) {
         var = malloc(sizeof(var_st));
         var->irname = NULL;
         /* allocate space in stack frame */
+        var->where = STACK_VAR;
+        var->ref   = 0;
         var->addr = func->rbytes;
         func->rbytes += 8; /* always align to 8 bytes */
         /* dont add to scope */
@@ -171,6 +175,12 @@ var_st* sym_make_temp_var(type_st *type) {
     var->value = NULL;
     var->ispar = 0;
     var->lvalue = 0;
+    return var;
+}
+
+var_st* sym_make_temp_lvar(type_st *type) { 
+    var_st *var = sym_make_temp_var();
+    var->lvalue = 1;
     return var;
 }
 
@@ -295,6 +305,10 @@ int sym_hastype(token_st *tk) {
 int sym_islabel(token_st* tk) {
     /* TODO */
     return 0;
+}
+
+int sym_is_pointer(var_st* v) {
+    return v->type->ref != NULL;
 }
 
 label_st* sym_make_label() {

@@ -1,0 +1,12 @@
+Language features
+1. types
+    1. void, char
+    2. pointer
+    3. struct, union
+    4. array
+    5. enum
+2. preprocessor
+3. &&, ||    
+
+Other features
+1. nicer error handling

@@ -310,7 +310,7 @@ var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) 
     PRS_FUNC_BG
     PT_FUNC
     
-    var_st *r = passed_primary, *t;
+    var_st *r = passed_primary, *t, *ind;
     
     if(!passed_primary)
         r = prs_primary();
@@ -320,7 +320,12 @@ var_st* prs_pst(var_st* passed_primary/* placeholder for primary-expression */) 
         if(lex_token.tk_str[0] == '[') {
             /* => '[' expression ']' */
             lex_next();
-            prs_expr();
+            ind = prs_expr();
+            assert(sym_is_pointer(r));
+            t = sym_make_temp_lvar(); /* make lvalue */
+            gen_emit(IR_IND, t, r, ind);
+            sym_dispose_temp_var(r);
+            r = t;
             prs_expect_char(']'); lex_next();
         }
         else if(lex_token.tk_str[0] == '.') {

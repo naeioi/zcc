@@ -39,11 +39,22 @@ typedef struct var_st {
     struct type_st  *type;
     union value_un *value;
     int      ispar; /* 0 if not parameter. otherwise parameter index. (i.e. ispar=1 for the first parameter) */
-    int     lvalue;
+    int      lvalue;
     
     /* for ir & gen */
     char *irname;
-    int addr; /* start address in stack frame. */
+    #define STACK_VAR 0
+    #define HEAP_VAR  1
+    int where; 
+    /* ref == 1 indicates this var is a lvalue and is indirectly access. 
+     * i.e. the address of var but not var itself is store on stack or heap
+     */
+    int ref; 
+    /* var address for stack_var. 
+     * access by -(addr+8)(%rbp)
+     * heap_var is access by name(%rip)
+     */
+    int addr;
 } var_st;
 
 typedef struct scope_st {
@@ -86,7 +97,8 @@ typedef enum ir_op_en {
     IR_GE,
     IR_NEQ,
     IR_INC,
-    IR_DEC
+    IR_DEC,
+    IR_IND
 } ir_op_en;
 
 typedef struct inst_st {
@@ -192,6 +204,7 @@ int sym_init();
 int sym_hasid(token_st*);
 int sym_hastype(token_st*);
 int sym_islabel(token_st*);
+int sym_is_pointer(var_st*);
 scope_st*   sym_make_scope();
 scope_st*   sym_mnp_scope(); /* make and push scope to context */
 void   sym_push_scope(scope_st*);
@@ -201,6 +214,7 @@ var_st*     sym_make_var(char*, type_st*);
 var_st*     sym_find_var(char*);
 var_st*     sym_add_var(var_st*);
 var_st*     sym_make_temp_var(type_st*);
+var_st*     sym_make_temp_lvar(type_st*);
 void        sym_dispose_temp_var(var_st*);
 var_st*     sym_make_imm(token_st*);
 var_st*     sym_make_par(char*, type_st*);

@@ -61,7 +61,8 @@ static void print_var(var_st *v) {
         }
     }
     else {
-        printf("%s[%s]", v->type->name, name_var(v));
+        type *base = v->type->ref ? v->type->ref : v->type;
+        printf("%s%s[%s]", base->name, base == v->type ? "" : "*", name_var(v));
     }    
     //printf("\t");
 }
@@ -207,6 +208,11 @@ void gen_print_func_ir(func_st* func) {
         else if(inst->op == IR_DEC) {
             printf("dec ");
             print_var_t(args[0]);
+        }
+        else if(inst->op == IR_IND) {
+            //var_st *d = args[0], *b = args[1], *i = args[2];
+            ptr("ind ");
+            print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
         }
         else fexit("Unexpected IR instruction");
         printf("\n");
