@@ -370,6 +370,7 @@ var_st* sym_deref(var_st *v) {
         r = malloc(sizeof(var_st));
         *r = *v;
         r->type = r->type->ref;
+        r->lvalue = 1;
         r->ref = 1;
     }
     else {
@@ -384,6 +385,7 @@ var_st* sym_deref(var_st *v) {
         r = sym_make_temp_var(v->type);
         gen_emit(IR_ASSIGN, r, v); 
         r->type = r->type->ref;
+        r->lvalue = 1;
         r->ref = 1;
     }
     return r;

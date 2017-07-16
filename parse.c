@@ -909,15 +909,15 @@ int prs_decl() {
         var = NULL;
         type = type_base;
         
-        if(lex_token.tk_str[0] == '*') {
+        while(lex_token.tk_str[0] == '*') {
             PT_PRT_IND
             fprintf(stderr, "operator[*]\n");
             
             lex_next();
             type = pointer_of(type);
         }
-        else
-            prs_expect_class(TK_IDENTIFIER); 
+        
+        prs_expect_class(TK_IDENTIFIER); 
         
         strcpy(vname, lex_token.tk_str);
         lex_next();
