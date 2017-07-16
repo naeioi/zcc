@@ -279,11 +279,21 @@ var_st* prs_unary() {
     else if(lex_isunaryop(&lex_token)) {
         /* TODO */
         /* => unary-operator unary-expression */
+        tk_class_en tk_class = lex_token.tk_class;
+        
         PT_PRT_IND
         fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
-        
         lex_next();
-        prs_unary();
+        
+        if(tk_class == TK_OP_MUL) {
+            r = prs_unary();
+            assert(sym_is_pointer(r));
+            r = sym_deref(r);
+        }
+        else {
+            /* TODO */
+            fexit("unary operator other than * not implemented");
+        }
     }
     else {
         r = prs_pst(0);

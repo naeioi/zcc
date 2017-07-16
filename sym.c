@@ -364,6 +364,31 @@ label_st* sym_make_label() {
     return label;
 }
 
+var_st* sym_deref(var_st *v) {
+    var_st *r;
+    if(v->ref == 0) {
+        r = malloc(sizeof(var_st));
+        *r = *v;
+        r->type = r->type->ref;
+        r->ref = 1;
+    }
+    else {
+        /* case study: 
+         * v is of type T*, v->ref == 1
+         * then v stores pointer to a pointer
+         * i.e. v --> &T --> T
+         * to derefence v, allocate a temp var r to store &T
+         * retrieve &T by assigning v to r
+         * then set r->ref = 1 so that r is of type T
+         */
+        r = sym_make_temp_var(v->type);
+        gen_emit(IR_ASSIGN, r, v); 
+        r->type = r->type->ref;
+        r->ref = 1;
+    }
+    return r;
+}
+
 type_st* pointer_of(type_st* type) {
     list_st *types = context.types;
     int i = 0;

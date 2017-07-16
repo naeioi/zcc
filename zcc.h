@@ -227,7 +227,9 @@ func_st*    sym_make_temp_func(char*, type_st*);
 func_st*    sym_find_func(char*);
 void        sym_add_type(type_st*);
 label_st*   sym_make_label();
+var_st*     sym_deref(var_st*);
 type_st*    pointer_of(type_st*);
+
 
 /* == gen == */
 void gen_emit0(ir_op_en);
