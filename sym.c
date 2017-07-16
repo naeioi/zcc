@@ -408,3 +408,41 @@ type_st* pointer_of(type_st* type) {
     sym_add_type(ntype);
     return ntype;
 }
+
+type_st* binop_res_type(ir_op_en op, type_st *x, type_st *y) {
+    if(x == type_int) {
+        if(y == type_int)
+            return type_int;
+        else if(y == type_char)
+            return type_int;
+        else if(y == type_int_ptr && (op == IR_ADD || op == IR_SUB))
+            return type_int_ptr;
+        else 
+            assert("Type error");
+    }
+    else if(x == type_int_ptr) {
+        if(y == type_int && (op == IR_ADD || op == IR_SUB))
+            return type_int_ptr;
+        else if(y == type_int_ptr && op == IR_SUB)
+            return type_int;
+    }
+    else if(x == type_char) {
+        if(y == type_int)
+            return type_int;
+        else if(y == type_char)
+            return type_char;
+        else if(y == type_char_ptr && (op == IR_ADD || op == IR_SUB))
+            return type_int_ptr;
+        else 
+            assert("Type error");
+    }
+    else if(x == type_char_ptr) {
+        if(y == type_int && (op == IR_ADD || op == IR_SUB))
+            return type_char_ptr;
+        else if(y == type_char_ptr && op == IR_SUB)
+            return type_int;
+    }
+    else 
+        fexit("Not supported types");
+    return NULL;
+}

@@ -176,7 +176,7 @@ var_st* prs_binary(int k) {
     PT_PRT_IND
     fprintf(stderr, "In prs_binary(k=%d)\n", k);
     
-    var_st *r, *t, *u = NULL;
+    var_st *r, *u = NULL, *x, *y, *t = sym_make_temp_var(type_int);
     ir_op_en    ir_op;
     tk_class_en tk_op;
     
@@ -185,7 +185,10 @@ var_st* prs_binary(int k) {
     for(i = prs_prec[lex_token.tk_class]; lex_valid() && i >= k; i--) {
         /* parse from high precedence to low precedence */
         /* TODO: 1. manage && || execution flow 
-                 2. Possibly handle assignment
+                 2. add support to other operators
+                 3. support for pointer add integer, pointers subtract
+                 4. support other operators
+                 5. variable lifting (a.k.a varible promition)
         */
         while(lex_valid() && prs_prec[lex_token.tk_class] == i) {
             
@@ -193,7 +196,6 @@ var_st* prs_binary(int k) {
             fprintf(stderr, "operator[%s]\n", lex_token.tk_str);
             
             tk_op = lex_token.tk_class;
-            /* TODO: add support to other operators */
             if(tk_op == TK_OP_ADD) ir_op = IR_ADD;
             else if(tk_op == TK_OP_LT) ir_op = IR_LT;
             else if(tk_op == TK_OP_LE) ir_op = IR_LE;
@@ -207,18 +209,34 @@ var_st* prs_binary(int k) {
             else fexit("Not supported operator %s", lex_token.tk_str);
             
             lex_next();
-            t = prs_binary(i+1);
+            y = prs_binary(i+1);
             
             if(u == NULL) {
                 /* TODO: variable lifting */
-                u = sym_make_temp_var(type_int);
-                gen_emit(ir_op, u, r, t);
+                x = r;
+                u = sym_make_temp_var(binop_res_type(ir_op, x->type, y->type));
             }
             else {
-                gen_emit(ir_op, u, u, t);
+                x = u;
+                u->type = binop_res_type(ir_op, x->type, y->type);
             }
+            
+            if(sym_is_pointer(x) || sym_is_pointer(y)) {
+                if(x->type == type_int) {
+                    gen_emit_offset(t, x, y->type->ref->bytes);
+                    x = y; y = t;
+                }
+                if(y->type == type_int) {
+                    gen_emit_offset(t, y, x->type->ref->bytes);
+                    y = t;
+                }
+            }
+            
+            gen_emit(ir_op, u, x, y);
         }
     }
+    
+    sym_dispose_temp_var(t);
     
     PRS_FUNC_ED
     return u ? u : r;

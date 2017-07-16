@@ -101,7 +101,8 @@ typedef enum ir_op_en {
     IR_NEQ,     /* ... */
     IR_INC,     /* (var) */
     IR_DEC,     /* ... */
-    IR_IND      /* (var, var, var) */
+    IR_IND,     /* (var, var, var) */
+    IR_OFFSET,  /* (var, var, int) */
 } ir_op_en;
 
 typedef struct inst_st {
@@ -229,7 +230,7 @@ void        sym_add_type(type_st*);
 label_st*   sym_make_label();
 var_st*     sym_deref(var_st*);
 type_st*    pointer_of(type_st*);
-
+type_st*    binop_res_type(ir_op_en, type_st*, type_st*);
 
 /* == gen == */
 void gen_emit0(ir_op_en);
@@ -237,6 +238,7 @@ void gen_emit1(ir_op_en, void*);
 void gen_emit2(ir_op_en, void*, void*);
 void gen_emit3(ir_op_en, void*, void*, void*);
 void gen_emit_call(ir_op_en, func_st*, var_st*, list_st*);
+void gen_emit_offset(var_st*, var_st*, int);
 void gen_print_func_ir(func_st*);
 
 /* target-specific gen 

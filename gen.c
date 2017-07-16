@@ -57,6 +57,10 @@ void gen_emit_call(ir_op_en op, func_st* func, var_st *rvar, list_st *args) {
     emit(inst);
 }
 
+void gen_emit_offset(var_st *d, var_st *v, int bytes) {
+    gen_emit3(IR_OFFSET, d, v, (void*)bytes); /* trick: use a void* to store int */
+}
+
 static void print_var(var_st *v) {
     //printf("[addr=%x]", v);
     if(v->value) {
@@ -219,6 +223,10 @@ void gen_print_func_ir(func_st* func) {
             //var_st *d = args[0], *b = args[1], *i = args[2];
             printf("ind ");
             print_var_t(args[0]); print_var_t(args[1]); print_var_t(args[2]); 
+        }
+        else if(inst->op == IR_OFFSET) {
+            printf("offset ");
+            print_var_t(args[0]); print_var_t(args[1]); printf("%d", (int)args[2]);
         }
         else fexit("Unexpected IR instruction");
         printf("\n");

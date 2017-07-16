@@ -31,7 +31,8 @@ static int isvar[][3] = {
     /* IR_NEQ */    { 1, 1, 1 },
     /* IR_INC */    { 1, 0, 0 },
     /* IR_DEC */    { 1, 0, 0 },
-    /* IR_IND */    { 1, 1, 1 }
+    /* IR_IND */    { 1, 1, 1 },
+    /* IR_OFFSET */ { 1, 1, 0 }
 };
 
 /* duplicate temp var. imm var not included */

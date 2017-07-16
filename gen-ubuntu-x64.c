@@ -374,6 +374,13 @@ static void gen_func(func_st *f) {
              */
              prt("\t mov\t %%rdi, %d(%%rbp)\n", ldd(d));
         }
+        else if(inst->op == IR_OFFSET) {
+            var_st *d = args[0], *v = args[1];
+            int size = (int)args[2];
+            loadsx(v, RAX);
+            prt("\t leaq\t 0(,%%rax,%d), %%rdi\n", size);
+            save(RDI, d);
+        }
         else fexit("Unexpected IR instruction");
         endl;
     }
