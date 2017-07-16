@@ -32,19 +32,19 @@ void gen_emit1(ir_op_en op, void* var) {
     /* Note: dup_temp_var is necessary for temp_var 
      * because its type may change over parsing, although its address remains constant
      */
-    inst->args[0] = dup_temp_var(var);
+    inst->args[0] = dup_arg(op, 0, var);
     emit(inst);
 }
 
 void gen_emit2(ir_op_en op, void* arg0, void* arg1) {
     inst_st *inst = make_inst(op);
-    inst->args[0] = dup_temp_var(arg0); inst->args[1] = dup_temp_var(arg1);
+    inst->args[0] = dup_arg(op, 0, arg0); inst->args[1] = dup_arg(op, 1, arg1); 
     emit(inst);
 }
 
 void gen_emit3(ir_op_en op, void* arg0, void* arg1, void* arg2) {
     inst_st *inst = make_inst(op);
-    inst->args[0] = dup_temp_var(arg0); inst->args[1] = dup_temp_var(arg1); inst->args[2] = dup_temp_var(arg2);
+    inst->args[0] = dup_arg(op, 0, arg0); inst->args[1] = dup_arg(op, 1, arg1); inst->args[2] = dup_arg(op, 2, arg2);
     emit(inst);
 }
 

@@ -246,8 +246,8 @@ static void gen_func(func_st *f) {
             var_st *d = args[0], *x = args[1], *y = args[2];
             load(x, RDI);
             load(y, RSI);
-            ireg2(sub, RDI, RSI);
-            save(RSI, d);
+            ireg2(sub, RSI, RDI);
+            save(RDI, d);
         }
         else if(inst->op == IR_MUL) {
             var_st *d = args[0], *x = args[1], *y = args[2];
@@ -296,8 +296,8 @@ static void gen_func(func_st *f) {
         }
         else if(inst->op == IR_LT) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            load(x, RDI);
-            load(y, RSI);
+            loadsx(x, RDI);
+            loadsx(y, RSI);
             ireg2(cmp, RSI, RDI);
             prt("\t setl\t %%al\n");
             prt("\t movzx\t %%al, %%rax\n");
@@ -305,8 +305,8 @@ static void gen_func(func_st *f) {
         }
         else if(inst->op == IR_LE) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            load(x, RDI);
-            load(y, RSI);
+            loadsx(x, RDI);
+            loadsx(y, RSI);
             ireg2(cmp, RSI, RDI);
             prt("\t setle\t %%al\n");
             prt("\t movzx\t %%al, %%rax\n");
@@ -314,8 +314,8 @@ static void gen_func(func_st *f) {
         }
         else if(inst->op == IR_EQ) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            load(x, RDI);
-            load(y, RSI);
+            loadsx(x, RDI);
+            loadsx(y, RSI);
             ireg2(cmp, RSI, RDI);
             prt("\t seteq\t %%al\n");
             prt("\t movzx\t %%al, %%rax\n");
@@ -323,8 +323,8 @@ static void gen_func(func_st *f) {
         }
         else if(inst->op == IR_GT) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            load(x, RDI);
-            load(y, RSI);
+            loadsx(x, RDI);
+            loadsx(y, RSI);
             ireg2(cmp, RSI, RDI);
             prt("\t setg\t %%al\n");
             prt("\t movzx\t %%al, %%rax\n");
@@ -332,8 +332,8 @@ static void gen_func(func_st *f) {
         }
         else if(inst->op == IR_GE) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            load(x, RDI);
-            load(y, RSI);
+            loadsx(x, RDI);
+            loadsx(y, RSI);
             ireg2(cmp, RSI, RDI);
             prt("\t setge\t %%al\n");
             prt("\t movzx\t %%al, %%rax\n");
@@ -341,8 +341,8 @@ static void gen_func(func_st *f) {
         }
         else if(inst->op == IR_NEQ) {
             var_st *r = args[0], *x = args[1], *y = args[2];
-            load(x, RDI);
-            load(y, RSI);
+            loadsx(x, RDI);
+            loadsx(y, RSI);
             ireg2(cmp, RSI, RDI);
             prt("\t setne\t %%al\n");
             prt("\t movzx\t %%al, %%rax\n");

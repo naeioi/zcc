@@ -12,7 +12,34 @@ void fexit(const char *format, ...) {
     exit(0);
 }
 
+static int isvar[][3] = {
+    /* IR_ADD */    { 1, 1, 1 },
+    /* IR_SUB */    { 1, 1, 1 },
+    /* IR_MUL */    { 1, 1, 1 },
+    /* IR_DIV */    { 1, 1, 1 },
+    /* IR_RETURN */ { 1, 0, 0 },
+    /* IR_CALL */   { 1, 0, 0 },
+    /* IR_ASSIGN */ { 1, 1, 0 },
+    /* IR_LABEL */  { 0, 0, 0 },
+    /* IR_JMP */    { 0, 0, 0 },
+    /* IR_CJMP */   { 1, 0, 0 },
+    /* IR_LT */     { 1, 1, 1 },
+    /* IR_LE */     { 1, 1, 1 },
+    /* IR_EQ */     { 1, 1, 1 },
+    /* IR_GT */     { 1, 1, 1 },
+    /* IR_GE */     { 1, 1, 1 },
+    /* IR_NEQ */    { 1, 1, 1 },
+    /* IR_INC */    { 1, 0, 0 },
+    /* IR_DEC */    { 1, 0, 0 },
+    /* IR_IND */    { 1, 1, 1 }
+};
+
 /* duplicate temp var. imm var not included */
+var_st *dup_arg(ir_op_en op, int i, var_st *var) {
+    if(!isvar[op][i]) return var;
+    return dup_temp_var(var);
+}
+
 var_st *dup_temp_var(var_st *var) {
     if(var->lvalue || var->value) return var;
     var_st *nvar = malloc(sizeof(var_st));

@@ -1,6 +1,5 @@
 /* zcc.h */
 #include <stdio.h>
-/* -- Runtime managerment -- */
 
 struct list_st;
 struct type_st;
@@ -10,6 +9,8 @@ struct var_st;
 union  value_un;
 struct token_st;
 enum ir_op_en;
+
+/* structs */
 
 typedef struct type_st {
     int bytes;
@@ -82,25 +83,25 @@ typedef struct context_st {
 } context_st;
 
 typedef enum ir_op_en {
-    IR_ADD,
-    IR_SUB,
-    IR_MUL,
-    IR_DIV,
-    IR_RETURN,
-    IR_CALL,
-    IR_ASSIGN,
-    IR_LABEL,
-    IR_JMP,
-    IR_CJMP,
-    IR_LT,
-    IR_LE,
-    IR_EQ,
-    IR_GT,
-    IR_GE,
-    IR_NEQ,
-    IR_INC,
-    IR_DEC,
-    IR_IND
+    IR_ADD = 0,     /* (var, var, var) */
+    IR_SUB,     /* ... */
+    IR_MUL,     /* ... */
+    IR_DIV,     /* ... */
+    IR_RETURN,  /* (var) */
+    IR_CALL,    /* (var, func, list<var>) */
+    IR_ASSIGN,  /* (var, var) */
+    IR_LABEL,   /* (label)  */
+    IR_JMP,     /* (label)  */
+    IR_CJMP,    /* (var, label) */
+    IR_LT,      /* (var, var, var) */
+    IR_LE,      /* ... */
+    IR_EQ,      /* ... */
+    IR_GT,      /* ... */
+    IR_GE,      /* ... */
+    IR_NEQ,     /* ... */
+    IR_INC,     /* (var) */
+    IR_DEC,     /* ... */
+    IR_IND      /* (var, var, var) */
 } ir_op_en;
 
 typedef struct inst_st {
@@ -244,6 +245,7 @@ void gen_assembly(FILE*);
 /* util */
 void fexit(const char *format, ...);
 char* dup_str(char*);
+var_st*   dup_arg(ir_op_en, int, var_st*);
 var_st*   dup_temp_var(var_st*);
 value_un* dup_value(token_st*);
 list_st* make_list();
